@@ -1,0 +1,24 @@
+# Dependencias y builds
+node_modules/
+dist/
+build/
+.ion-ide/
+
+# Archivos de diagramas y planificación pesados
+Diagrama Rubrica.png
+Diagrama Rubrica Claro.png
+Plan Excali Fable5.excalidraw
+*.excalidraw
+
+# Entorno y logs
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SO / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
