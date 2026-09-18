@@ -48,7 +48,7 @@ La aplicación responde a este contexto y a los principios de transformación di
 | RF-08 | Funcionario | Resolución de solicitudes: aprobar, rechazar o solicitar información, con observaciones |
 | RF-09 | Funcionario | Panel de reportes y estadísticas (cantidad por estado, tiempos, tipos más solicitados) |
 
-El detalle completo de requerimientos funcionales y no funcionales está en el [`README.md` de la rama `frontend`](../../tree/frontend).
+Mas detalles ha futuro en [`README.md` de la rama `frontend`](../../tree/frontend). (actualmente trabajando en el Figma antes que mas ramas)
 
 ## Requerimientos no funcionales
 
@@ -109,9 +109,7 @@ npx ionic capacitor run ios
 ```
 
 ## Diseño y prototipo
-
-- [Prototipo en Figma](#): reemplazar por el link público.
-- [Tablero / gestión del proyecto](#) (opcional).
+- [Prototipo en Figma](#): https://www.figma.com/design/PDRMB1YzTolGblTi9Cxy10/MuniSitioDomingo?node-id=0-1&t=wjmz0PMK0jp7Rtdt-1
 
 ## Ramas del repositorio
 
