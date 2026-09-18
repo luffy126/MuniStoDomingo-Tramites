@@ -1,111 +1,122 @@
-# MuniStoDomingo-Tramites
+# 🏛️ MuniStoDomingo: Trámites Municipales
 
-Proyecto del ramo Ingeniería Web y Móvil.
+Aplicación móvil y web para que los vecinos de la **Municipalidad de Santo Domingo** realicen y sigan trámites municipales en línea, sin filas ni horarios de oficina.
 
-**Link tema proyecto:** https://docs.google.com/spreadsheets/d/1Mfr8R9WWUvdBTjp0MgDnQqwdNZQ0ddDiAtGmlMuQYts/edit?pli=1&gid=2073481615#gid=2073481615
+## Integrantes del equipo
 
-**Link repo ejemplo del ayudante:** https://github.com/YosoyelDario/Movie-Series-Tracker/tree/main
-## Integrantes
+| Nombre | Rol en el proyecto |
+| --- | --- |
+| Simón Ledezma | CEO del Repo (por definir) |
+| Tomás Monge | Levantando el proyecto con un terremoto (por definir) |
+| Francisco Espinoza | Experto en Antigravity 2.0 (por definir) |
 
-- Simón Ledezma
-- Tomás Monge
-- Francisco Espinoza
+## Distribución de responsabilidades
 
----
+- **Frontend (Ionic + React):** estructura de vistas, componentes, navegación con React Router.
+- **UI/UX y Figma:** mockups móvil/web, flujo de navegación, jerarquía visual.
+- **Backend (a desarrollar en EP2):** API REST, base de datos relacional, autenticación JWT.
+- **Documentación y gestión:** README, ramas, control de versiones, evidencia de avance.
 
-# Entrega Parcial 1 — Checklist
+## Descripción general
 
-## EP 1.1: Requerimientos
+MuniStoDomingo es una plataforma que permite a los vecinos consultar el catálogo de trámites disponibles, iniciar una solicitud, adjuntar documentos digitales y hacer seguimiento del estado en tiempo real. Incluye un rol de **Funcionario municipal** encargado de gestionar las solicitudes: revisarlas, aprobarlas, rechazarlas o solicitar información adicional, además de visualizar reportes y estadísticas del servicio.
 
-Definición de al menos 7 requerimientos funcionales y al menos 5 no funcionales (rendimiento, seguridad, usabilidad). Estas funcionalidades no pueden ser repetitivas. Estas funcionalidades están fuera de inicio de sesión o registrarse, ya que deben estar inmersas en la propuesta. Dentro de las funcionalidades deben considerar dos tipos de roles (ejemplo: usuario y admin).
+## Problema que aborda
 
-## EP 1.2: Justificación del problema y caracterización de usuarios
+Hoy un vecino que necesita un trámite (certificado de residencia, permiso de circulación, un reclamo) debe asistir presencialmente a la municipalidad en horario de oficina, sin claridad sobre los requisitos, enfrentando filas y múltiples visitas si falta algún documento. No existe un canal simple para saber **en qué va** su solicitud. La institución, por su parte, no cuenta con trazabilidad ni métricas de su carga de trabajo.
 
-El equipo deberá describir y justificar el problema que abordará la aplicación, explicando su contexto, relevancia y las consecuencias asociadas a su falta de solución.
+La aplicación responde a este contexto y a los principios de transformación digital de la **Ley 21.180** y de los procedimientos administrativos de la **Ley 19.880**, para ofrecer un trámite remoto, con requisitos visibles, seguimiento del estado y notificaciones automáticas.
 
-Debido a que durante esta etapa no se realizará contacto directo con usuarios, la caracterización de los usuarios objetivo deberá elaborarse mediante investigación documental y análisis de soluciones existentes. Para ello, podrán utilizarse fuentes académicas, informes, estadísticas públicas, sitios institucionales, normativas, casos de estudio y aplicaciones similares.
+## Objetivos del proyecto
 
-La entrega deberá incluir:
+- Permitir a los vecinos consultar, iniciar y seguir trámites municipales de forma digital.
+- Centralizar la carga y validación de documentos requeridos por cada trámite.
+- Dar al funcionario herramientas de gestión, resolución y reportes sobre las solicitudes.
+- Entregar una experiencia responsiva y accesible entre móvil (Ionic) y web.
 
-- Definición del grupo o grupos de usuarios a los cuales estará dirigida la aplicación.
-- Descripción general de sus características, necesidades y posibles dificultades.
-- Contexto en el que utilizarían la aplicación.
-- Objetivos o tareas que realizarían dentro del sistema.
-- Nivel estimado de experiencia tecnológica.
-- Necesidades de accesibilidad, seguridad o privacidad, cuando corresponda.
-- Identificación de los roles considerados en el sistema.
-- Elaboración de, al menos, dos perfiles de usuario hipotéticos (proto-personas).
-- Identificación de los supuestos utilizados para construir dichos perfiles.
+## Funcionalidades principales
 
-Cada proto-persona deberá incluir, como mínimo:
+| ID | Rol | Funcionalidad |
+| --- | --- | --- |
+| RF-01 | Vecino | Catálogo de trámites con búsqueda y filtros por categoría |
+| RF-02 | Vecino | Inicio de trámite: selección y envío del formulario correspondiente |
+| RF-03 | Vecino | Adjuntar documentos digitales (PDF/imagen) con validación de formato y tamaño |
+| RF-04 | Vecino | Seguimiento del estado del trámite (Pendiente → En revisión → Aprobado/Rechazado) |
+| RF-05 | Vecino | Notificaciones ante cambios de estado o requerimientos de información |
+| RF-06 | Vecino | Gestión del perfil (nombre, teléfono, dirección) |
+| RF-07 | Funcionario | Gestión de solicitudes: listar, filtrar y priorizar |
+| RF-08 | Funcionario | Resolución de solicitudes: aprobar, rechazar o solicitar información, con observaciones |
+| RF-09 | Funcionario | Panel de reportes y estadísticas (cantidad por estado, tiempos, tipos más solicitados) |
 
-- Tipo de usuario o rol.
-- Características generales.
-- Necesidades principales.
-- Objetivos de uso.
-- Dificultades o puntos de frustración.
-- Funcionalidades de la aplicación que utilizaría.
-- Dispositivo y contexto probable de acceso.
+El detalle completo de requerimientos funcionales y no funcionales está en el [`README.md` de la rama `frontend`](../../tree/frontend).
 
-Los perfiles construidos no deberán presentarse como resultados obtenidos de usuarios reales. El equipo deberá indicar claramente que corresponden a una caracterización preliminar basada en fuentes secundarias y supuestos razonados.
+## Requerimientos no funcionales
 
-## EP 1.3: Bocetos de UI/UX y prototipo en Figma
+| ID | Categoría | Descripción |
+| --- | --- | --- |
+| RNF-01 | Rendimiento | Páginas cargables en menos de 3 s en conexiones 3G (Lighthouse Performance ≥ 70) |
+| RNF-02 | Seguridad | Contraseñas de mínimo 8 caracteres (mayúscula, minúscula y número); rutas protegidas por autenticación y rol |
+| RNF-03 | Usabilidad | Acciones principales en máximo 3 clics desde el dashboard; errores de formulario en tiempo real |
+| RNF-04 | Accesibilidad | WCAG 2.1 nivel AA (contraste ≥ 4.5:1, navegación por teclado, etiquetas ARIA) |
+| RNF-05 | Compatibilidad | Funcionamiento en Chrome, Firefox y Safari, y en móvil vía Capacitor (iOS/Android) |
 
-Al menos 7 mockups o pantallas distintas, cada una correspondiente a una funcionalidad previamente definida en los requerimientos del proyecto. Cada pantalla deberá presentar un diseño diferenciado, coherente con el flujo de navegación y la jerarquía de información. Las interfaces deberán ser prototipadas considerando explícitamente: versión móvil y web.
+## Tecnologías y herramientas
 
-El formulario de registro deberá incluir los campos necesarios para identificar y registrar adecuadamente a los usuarios de la aplicación. La selección de estos campos deberá ajustarse al problema abordado, a las características de los usuarios objetivo y a los requerimientos definidos por cada equipo. Los equipos deberán justificar brevemente la información solicitada, evitando incorporar datos personales que no sean necesarios para el funcionamiento de la aplicación. El formulario podrá considerar, por ejemplo, nombre de usuario, correo electrónico, contraseña, confirmación de contraseña, aceptación de términos y condiciones u otros campos pertinentes para la propuesta.
+**Frontend**
+- Ionic + React + TypeScript
+- React Router
+- Capacitor
 
-Los formularios de inicio de sesión y registro deberán representar visualmente:
+**Backend** *(Entrega Parcial 2)*
+- Node.js + Express
+- PostgreSQL / MySQL
+- JWT + bcrypt
 
-- Campos obligatorios y opcionales.
-- Formato esperado de los datos.
-- Validaciones de entrada.
-- Mensajes de error claros.
-- Retroalimentación ante el envío del formulario.
-- Condiciones de seguridad aplicables a las contraseñas.
-- Una experiencia de uso coherente con los usuarios objetivo.
+**Herramientas**
+- Figma (prototipado UI/UX)
+- Git / GitHub
+- Postman / Insomnia
 
-## EP 1.4: Arquitectura de navegación y experiencia del usuario
+## Instrucciones de instalación
 
-El equipo deberá definir la arquitectura de navegación de la aplicación, describiendo la estructura de rutas, jerarquía de vistas y flujo de interacción entre pantallas.
+```bash
+# Clonar el repositorio
+git clone https://github.com/luffy126/MuniStoDomingo-Tramites.git
+cd MuniStoDomingo-Tramites
 
-La entrega deberá incluir:
+# Cambiar a la rama frontend
+git checkout frontend
 
-- (a) Rutas principales y secundarias.
-- (b) Relaciones jerárquicas entre vistas.
-- (c) Flujo de navegación entre funcionalidades.
-- (d) Diferenciación de acceso según roles (por ejemplo: usuario / administrador).
-- (e) Flujo de las principales tareas (task flow).
-- (f) Puntos críticos de interacción.
-- (g) Coherencia de experiencia entre dispositivos.
-- (h) Breve justificación técnica de las decisiones adoptadas, considerando usabilidad, eficiencia de interacción, claridad estructural y escalabilidad de la arquitectura frontend.
+# Instalar dependencias
+npm install
+```
 
-## EP 1.5: Creación del proyecto en Ionic con React
+## Instrucciones de ejecución
 
-Considerando:
+```bash
+# Levantar la app en modo desarrollo (web)
+npm run dev
 
-- (a) Uso de React Router.
-- (b) Rutas públicas y rutas protegidas.
-- (c) Redirecciones (ejemplo: login obligatorio).
-- (d) Estructura modular de vistas.
+# Alternativa con Ionic CLI
+npx ionic serve
 
-Los equipos podrán apoyarse en asistentes de inteligencia artificial, complementos de Figma o herramientas de generación de código para orientar la implementación de las interfaces. Sin embargo, deberán considerar que el código generado automáticamente puede corresponder a React convencional y no necesariamente ser compatible con la estructura, los componentes y los patrones de navegación propios de Ionic. Por lo tanto, el equipo será responsable de revisar, comprender, corregir y adaptar el código generado para integrarlo adecuadamente en una aplicación desarrollada con Ionic y React.
+# Compilar para producción
+npm run build
 
-La implementación final deberá:
+# Ejecutar en emulador Android/iOS
+npx ionic capacitor run android
+npx ionic capacitor run ios
+```
 
-- Utilizar componentes propios de Ionic, tales como `IonPage`, `IonHeader`, `IonContent`, `IonMenu`, `IonTabs`, `IonInput` e `IonButton`.
-- Integrarse correctamente con la estructura de rutas de la aplicación.
-- Mantener una organización modular y comprensible del código.
-- Funcionar adecuadamente en versiones móvil y web.
-- Respetar el diseño y los flujos definidos en el prototipo de Figma.
-- Evitar código innecesario, duplicado o que el equipo no pueda explicar.
-- Cumplir con los requerimientos funcionales y no funcionales definidos para el proyecto.
+## Diseño y prototipo
 
-El uso de estas herramientas se considerará solamente un mecanismo de apoyo. No se aceptará como implementación final la copia directa de código generado automáticamente sin revisión, adaptación, integración y validación por parte del equipo.
+- [Prototipo en Figma](#): reemplazar por el link público.
+- [Tablero / gestión del proyecto](#) (opcional).
 
-## EP 1.6: Diseño de pantallas principales
+## Ramas del repositorio
 
-Diseño de pantallas principales incorporando una estructura de navegación funcional y coherente con la arquitectura previamente definida en Ionic-React (al menos 4).
-
-- Uso de componentes propios de Ionic (`IonPage`, `IonHeader`, `IonContent`, `IonTabs`, `IonMenu`, etc.).
-- Separación estructural del código en carpetas (`pages`, `components`, `routes`, `services`).
+| Rama | Contenido |
+| --- | --- |
+| `main` | Documentación general del proyecto |
+| `frontend` | Código de interfaz (Ionic + React) + requerimientos funcionales/no funcionales |
+| `backend` | API REST, conexión a base de datos y script `.sql` |
