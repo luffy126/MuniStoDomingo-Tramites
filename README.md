@@ -110,6 +110,7 @@ npx ionic capacitor run ios
 
 ## Diseño y prototipo
 - [Prototipo en Figma](#): https://www.figma.com/design/PDRMB1YzTolGblTi9Cxy10/MuniSitioDomingo?node-id=0-1&t=wjmz0PMK0jp7Rtdt-1
+- Link Prototipo Aplicación (front): https://ingweb.simonholic.sbs/ (nota: solo esta activa cuando tengo el pc encendido (casi siempre (24/7 (puse muchos paréntesis?))))
 
 ## Documentación de la entrega parcial 1
 
