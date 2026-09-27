@@ -1,4 +1,4 @@
-# EP 1.2 — Justificación del problema y caracterización de usuarios
+# EP 1.2 - Justificación del problema y caracterización de usuarios
 
 > **Nota:** Esta caracterización es preliminar, elaborada mediante investigación documental y análisis de soluciones existentes. Los perfiles de usuario presentados no corresponden a resultados obtenidos de usuarios reales, sino a una construcción hipotética basada en fuentes secundarias y supuestos razonados.
 
@@ -16,7 +16,7 @@ En Chile, los municipios constituyen la unidad administrativa más cercana a la 
 
 Actualmente, los vecinos que necesitan realizar un trámite municipal (certificado de residencia, permiso de circulación, reclamos, solicitudes varias) deben:
 
-- Asistir presencialmente a las oficinas municipales en horario laboral (lunes a viernes, 08:30–14:00 aprox.).
+- Asistir presencialmente a las oficinas municipales en horario laboral (lunes a viernes, 08:30-14:00 aprox.).
 - Desconocer con anticipación los requisitos documentales de cada trámite, lo que genera múltiples visitas.
 - Enfrentar filas y tiempos de espera sin garantía de atención.
 - No contar con un canal para consultar el estado de su solicitud una vez ingresada.
@@ -54,14 +54,14 @@ La aplicación considera dos roles principales:
 ### 2.2 Características generales de los usuarios
 
 **Vecinos:**
-- Rango etario amplio (18–75 años), con mayor concentración entre 30–60 años.
+- Rango etario amplio (18-75 años), con mayor concentración entre 30-60 años.
 - Nivel de experiencia tecnológica heterogéneo: desde usuarios frecuentes de smartphones hasta personas con alfabetización digital básica.
 - Dispositivo principal de acceso: teléfono móvil (Android predominante en segmentos de menor ingreso).
 - Contexto de uso: desde el hogar, el lugar de trabajo o en movilidad; conexión a internet variable (3G/4G en zonas rurales).
 - Necesidades de accesibilidad: contraste adecuado, tamaños de texto legibles, navegación simple.
 
 **Funcionarios municipales:**
-- Rango etario predominante: 30–55 años.
+- Rango etario predominante: 30-55 años.
 - Nivel de experiencia tecnológica medio; familiarizados con herramientas ofimáticas pero no necesariamente con aplicaciones web modernas.
 - Dispositivo de acceso: computador de escritorio en oficina municipal.
 - Contexto de uso: jornada laboral, con conexión a internet estable.
@@ -85,8 +85,8 @@ La aplicación considera dos roles principales:
 
 | Rol | Objetivos | Tareas principales |
 |-----|-----------|-------------------|
-| Vecino | Realizar trámites remotamente y con transparencia | Buscar trámite → ver requisitos → llenar formulario → adjuntar documentos → enviar → consultar estado → recibir notificación |
-| Funcionario | Gestionar solicitudes eficientemente | Listar solicitudes → filtrar/priorizar → revisar documentos → aprobar/rechazar/solicitar info → ver reportes |
+| Vecino | Realizar trámites remotamente y con transparencia | Buscar trámite > ver requisitos > llenar formulario > adjuntar documentos > enviar > consultar estado > recibir notificación |
+| Funcionario | Gestionar solicitudes eficientemente | Listar solicitudes > filtrar/priorizar > revisar documentos > aprobar/rechazar/solicitar info > ver reportes |
 
 ### 2.5 Necesidades de accesibilidad, seguridad y privacidad
 
@@ -98,7 +98,7 @@ La aplicación considera dos roles principales:
 
 ## 3. Proto-personas
 
-> Los siguientes perfiles son construcciones hipotéticas basadas en datos demográficos públicos (INE, Censo 2017), informes de Gobierno Digital y el análisis de plataformas municipales existentes (e.g., portal de trámites de la Municipalidad de Providencia, ChileAtiende). No representan usuarios reales entrevistados.
+> Los siguientes perfiles son construcciones hipotéticas basadas en datos demográficos públicos (INE, Censo 2018), informes de Gobierno Digital y el análisis de plataformas municipales existentes (e.g., portal de trámites de la Municipalidad de Providencia, ChileAtiende). No representan usuarios reales entrevistados.
 
 ### Proto-persona 1: María González (Vecina)
 
@@ -133,7 +133,7 @@ La aplicación considera dos roles principales:
 | **Objetivos de uso** | Reducir el tiempo que dedica a responder consultas de estado por teléfono y ventanilla. Tener un registro digital de las resoluciones que emite. |
 | **Dificultades / Frustraciones** | Pierde tiempo atendiendo vecinos que solo preguntan "¿en qué va mi trámite?". No tiene forma fácil de saber cuántas solicitudes lleva resueltas en el mes. A veces pierde papeles o no recuerda si ya respondió una solicitud. |
 | **Funcionalidades que utilizaría** | Gestión de solicitudes (RF-07), resolución con observaciones (RF-08), panel de reportes (RF-09). |
-| **Dispositivo y contexto** | PC de escritorio, navegador Chrome, red LAN municipal, jornada de oficina (08:30–17:30). |
+| **Dispositivo y contexto** | PC de escritorio, navegador Chrome, red LAN municipal, jornada de oficina (08:30-17:30). |
 
 #### Supuestos utilizados
 - El perfil se construye a partir de la estructura organizacional tipo de municipios pequeños descrita en informes de la Subdere.
@@ -148,11 +148,10 @@ La aplicación considera dos roles principales:
 
 <!-- Completar con las fuentes reales que se utilicen -->
 
-1. INE Chile — Censo de Población y Vivienda 2017. Resultados por comuna.
-2. Ley 21.180 — Transformación Digital del Estado. Biblioteca del Congreso Nacional.
-3. Ley 19.880 — Bases de los Procedimientos Administrativos. BCN.
-4. Subtel — Informe de penetración de internet por comunas (2023).
-5. AMUCH — Diagnóstico de gestión municipal en comunas rurales.
-6. División de Gobierno Digital — Índice de Gobierno Digital Municipal.
-7. Municipalidad de Providencia — Portal de trámites en línea (referencia de solución existente).
-8. ChileAtiende — Plataforma de trámites del Estado.
+- Instituto Nacional de Estadísticas (INE) (2018): Censo de Población y Vivienda 2017: Resultados Definitivos por Comuna (Santo Domingo). Ficha Comunal del Sistema de Información Regional, Biblioteca del Congreso Nacional de Chile (BCN).
+- Ministerio Secretaría General de la Presidencia (2019): Ley N° 21.180 sobre Transformación Digital del Estado, publicada en el Diario Oficial el 11 de noviembre de 2019. Modifica la Ley N° 19.880 sobre Bases de los Procedimientos Administrativos.
+- Asociación de Municipalidades de Chile (AMUCH) (2024): Innovación y tecnología en los municipios de Chile: Brechas y desafíos para la gestión local. Dirección de Estudios AMUCH, Santiago.
+- Secretaría de Gobierno Digital (SGD), Ministerio de Hacienda (2023): Informe Técnico: Índice de Preparación Municipal para la Transformación Digital. Evaluación diagnóstica de capacidades tecnológicas y de interoperabilidad en municipalidades chilenas.
+- Subsecretaría de Telecomunicaciones (SUBTEL) (2023): Series Estadísticas de Telecomunicaciones: Conexiones a Internet por Tecnología y Comuna y datos del Registro Nacional de Conectividad.
+- Subsecretaría de Desarrollo Regional y Administrativo (SUBDERE): Plataforma de Servicios Electrónicos Municipales (SEM) y Sistema Nacional de Información Municipal (SINIM).
+- Casos y plataformas de referencia: Portal de Trámites en Línea de la Municipalidad de Providencia (tramites.providencia.cl) y plataforma integral de servicios del Estado ChileAtiende (Instituto de Previsión Social - IPS).
