@@ -6,9 +6,9 @@ Aplicación móvil y web para que los vecinos de la **Municipalidad de Santo Dom
 
 | Nombre | Rol en el proyecto |
 | --- | --- |
-| Simón Ledezma | CEO del Repo (por definir) |
-| Tomás Monge | Levantando el proyecto con un terremoto (por definir) |
-| Francisco Espinoza | Experto en Antigravity 2.0 (por definir) |
+| Simón Ledezma | CEO del Repo |
+| Tomás Monge | Encargado de desarrollo movil |
+| Francisco Espinoza | encargado de desarrollo Web |
 
 ## Distribución de responsabilidades
 
