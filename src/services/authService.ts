@@ -19,9 +19,10 @@ interface StoredUser extends User {
 }
 
 const STORAGE_KEY = 'munisd.sesion';
+const STORAGE_USERS_KEY = 'munisd.usuarios';
 const LATENCIA_MS = 400;
 
-const usuarios: StoredUser[] = [
+const INITIAL_USUARIOS: StoredUser[] = [
   {
     id: 'u-1',
     nombre: 'Vecino Demo',
@@ -37,6 +38,30 @@ const usuarios: StoredUser[] = [
     rol: 'funcionario',
   },
 ];
+
+let usuarios: StoredUser[] = [...INITIAL_USUARIOS];
+
+const cargarUsuarios = () => {
+  try {
+    const storage = window.localStorage;
+    const guardado = storage.getItem(STORAGE_USERS_KEY);
+    if (guardado) {
+      usuarios = JSON.parse(guardado);
+    }
+  } catch {
+    // Ignorar si no hay localStorage o hay error de parseo
+  }
+};
+
+const guardarUsuarios = () => {
+  try {
+    window.localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(usuarios));
+  } catch {
+    // Ignorar si no se puede guardar
+  }
+};
+
+cargarUsuarios();
 
 const esperar = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -70,6 +95,7 @@ export const registerRequest = async (datos: RegisterData): Promise<User | null>
     rol: datos.rol ?? 'vecino',
   };
   usuarios.push(nuevo);
+  guardarUsuarios();
   return sinPassword(nuevo);
 };
 

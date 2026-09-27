@@ -97,7 +97,9 @@ const TRAMITES: Tramite[] = [
   },
 ];
 
-let solicitudes: Solicitud[] = [
+const STORAGE_SOLICITUDES_KEY = 'munisd.solicitudes';
+
+const INITIAL_SOLICITUDES: Solicitud[] = [
   {
     id: 'SOL-1001',
     tramiteId: 'cert-residencia',
@@ -137,6 +139,29 @@ let solicitudes: Solicitud[] = [
     estado: 'pendiente',
   },
 ];
+
+let solicitudes: Solicitud[] = [...INITIAL_SOLICITUDES];
+
+const cargarSolicitudes = () => {
+  try {
+    const guardado = window.localStorage.getItem(STORAGE_SOLICITUDES_KEY);
+    if (guardado) {
+      solicitudes = JSON.parse(guardado);
+    }
+  } catch {
+    // Ignorar si no hay localStorage o hay error de parseo
+  }
+};
+
+const guardarSolicitudes = () => {
+  try {
+    window.localStorage.setItem(STORAGE_SOLICITUDES_KEY, JSON.stringify(solicitudes));
+  } catch {
+    // Ignorar si no se puede guardar
+  }
+};
+
+cargarSolicitudes();
 
 const NOTIFICACIONES: Notificacion[] = [
   {
@@ -219,6 +244,7 @@ export const crearSolicitud = (datos: NuevaSolicitud): Solicitud => {
     observaciones: datos.observaciones,
   };
   solicitudes = [nueva, ...solicitudes];
+  guardarSolicitudes();
   return nueva;
 };
 
@@ -235,6 +261,9 @@ export const actualizarEstadoSolicitud = (
     actualizada = { ...solicitud, estado, observaciones: observaciones ?? solicitud.observaciones };
     return actualizada;
   });
+  if (actualizada) {
+    guardarSolicitudes();
+  }
   return actualizada;
 };
 
