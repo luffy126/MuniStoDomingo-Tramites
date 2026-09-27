@@ -41,7 +41,7 @@ La aplicación responde a este contexto y a los principios de transformación di
 | RF-01 | Vecino | Catálogo de trámites con búsqueda y filtros por categoría |
 | RF-02 | Vecino | Inicio de trámite: selección y envío del formulario correspondiente |
 | RF-03 | Vecino | Adjuntar documentos digitales (PDF/imagen) con validación de formato y tamaño |
-| RF-04 | Vecino | Seguimiento del estado del trámite (Pendiente → En revisión → Aprobado/Rechazado) |
+| RF-04 | Vecino | Seguimiento del estado del trámite (Pendiente > En revisión > Aprobado/Rechazado) |
 | RF-05 | Vecino | Notificaciones ante cambios de estado o requerimientos de información |
 | RF-06 | Vecino | Gestión del perfil (nombre, teléfono, dirección) |
 | RF-07 | Funcionario | Gestión de solicitudes: listar, filtrar y priorizar |
@@ -110,6 +110,19 @@ npx ionic capacitor run ios
 
 ## Diseño y prototipo
 - [Prototipo en Figma](#): https://www.figma.com/design/PDRMB1YzTolGblTi9Cxy10/MuniSitioDomingo?node-id=0-1&t=wjmz0PMK0jp7Rtdt-1
+
+## Documentación de la entrega parcial 1
+
+La documentación de cada punto de la EP 1 está centralizada en [`docs/EP1/`](docs/EP1/):
+
+| Punto | Contenido |
+| --- | --- |
+| [EP 1.1](docs/EP1/EP1.1-requerimientos/) | Requerimientos funcionales y no funcionales |
+| [EP 1.2](docs/EP1/EP1.2-usuarios/) | Justificación del problema y caracterización de usuarios |
+| [EP 1.3](docs/EP1/EP1.3-ui-ux-figma/) | Bocetos de UI/UX, prototipo en Figma y sistema de diseño |
+| [EP 1.4](docs/EP1/EP1.4-arquitectura-navegacion/) | Arquitectura de navegación y experiencia de usuario |
+| [EP 1.5](docs/EP1/EP1.5-proyecto-ionic/) | Creación del proyecto en Ionic con React |
+| [EP 1.6](docs/EP1/EP1.6-pantallas/) | Diseño de las pantallas principales |
 
 ## Ramas del repositorio
 
