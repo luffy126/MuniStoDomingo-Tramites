@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IonButton, IonCheckbox, IonInput, IonNote, IonSpinner } from '@ionic/react';
+import { IonButton, IonCheckbox, IonInput, IonNote, IonSpinner, IonInputPasswordToggle } from '@ionic/react';
 import { REQUISITO_PASSWORD, esEmailValido, esPasswordSegura } from '../../utils/validators';
 import type { RegisterData } from '../../services/authService';
 
@@ -100,7 +100,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, cargando }) => {
         value={password}
         className="ion-margin-top"
         onIonInput={(event) => setPassword(event.detail.value ?? '')}
-      />
+      >
+        <IonInputPasswordToggle slot="end" />
+      </IonInput>
       {errores.password !== undefined ? (
         <IonNote color="danger" className="mensaje-error">
           {errores.password}
@@ -120,7 +122,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, cargando }) => {
         value={confirmacion}
         className="ion-margin-top"
         onIonInput={(event) => setConfirmacion(event.detail.value ?? '')}
-      />
+      >
+        <IonInputPasswordToggle slot="end" />
+      </IonInput>
       {errores.confirmacion !== undefined ? (
         <IonNote color="danger" className="mensaje-error">
           {errores.confirmacion}

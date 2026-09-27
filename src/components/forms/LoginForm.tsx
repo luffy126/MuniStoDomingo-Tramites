@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IonButton, IonInput, IonNote, IonSpinner } from '@ionic/react';
+import { IonButton, IonInput, IonNote, IonSpinner, IonInputPasswordToggle } from '@ionic/react';
 import { esEmailValido } from '../../utils/validators';
 
 interface LoginFormProps {
@@ -73,7 +73,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, cargando }) => {
         value={password}
         className="ion-margin-top ion-margin-bottom"
         onIonInput={(event) => setPassword(event.detail.value ?? '')}
-      />
+      >
+        <IonInputPasswordToggle slot="end" />
+      </IonInput>
       {errores.password !== undefined ? (
         <IonNote color="danger" className="mensaje-error">
           {errores.password}
