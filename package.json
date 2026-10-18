@@ -1,0 +1,20 @@
+{
+  "name": "muni-stodomingo-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend de MuniStoDomingo-Tramites: API REST y acceso a la base de datos",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
