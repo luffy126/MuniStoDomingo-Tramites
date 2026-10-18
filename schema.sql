@@ -2,6 +2,10 @@
 -- Propuesta inicial derivada del modelo de datos del frontend.
 -- Probado con MySQL 8 / MariaDB 10.
 
+CREATE DATABASE IF NOT EXISTS muni_stodomingo
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE muni_stodomingo;
+
 CREATE TABLE usuario (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   nombre          VARCHAR(120)  NOT NULL,
@@ -67,9 +71,7 @@ CREATE INDEX idx_solicitud_estado ON solicitud (estado);
 CREATE INDEX idx_solicitud_vecino ON solicitud (vecino_id);
 CREATE INDEX idx_notificacion_usuario ON notificacion (usuario_id, leida);
 
--- ============================================================
 -- DATOS SEMILLA
--- ============================================================
 
 -- Usuarios de prueba. Contraseña de ambos: Test1234
 -- El valor almacenado es el hash bcrypt (10 rondas), nunca la contraseña en claro.
