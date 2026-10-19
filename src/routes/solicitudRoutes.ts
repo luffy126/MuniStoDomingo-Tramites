@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import authMiddleware from '../middleware/authMiddleware';
-import roleMiddleware from '../middleware/roleMiddleware';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { roleMiddleware } from '../middleware/roleMiddleware';
 import {
   crearSolicitud,
   listarSolicitudes,

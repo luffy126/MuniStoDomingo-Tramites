@@ -9,11 +9,11 @@ Todos los ejemplos de respuesta son reales, obtenidos con los datos semilla de `
 - [Convenciones generales](#convenciones-generales)
 - [Resumen de endpoints](#resumen-de-endpoints)
 - [Health](#health)
+- [Autenticación](#autenticación)
 - [Trámites](#trámites)
 - [Solicitudes](#solicitudes)
 - [Reportes](#reportes)
 - [Notificaciones](#notificaciones)
-- [Autenticación (pendiente)](#autenticación-pendiente)
 - [Cómo probar la API](#cómo-probar-la-api)
 
 ---
@@ -35,25 +35,43 @@ El frontend puede revisar siempre `success` primero; `data` solo existe cuando e
 | Código | Significado en esta API |
 | --- | --- |
 | `200` | Consulta o actualización exitosa |
-| `201` | Solicitud creada |
-| `400` | Falta un campo, tiene un valor no permitido o el body no es JSON válido |
-| `401` | No autenticado (falta el token o es inválido) |
-| `403` | Autenticado, pero el rol no tiene permiso para ese endpoint |
+| `201` | Usuario o solicitud creados |
+| `400` | Falta un campo, tiene un valor no permitido o el body no es JSON válido (`Datos de entrada inválidos`) |
+| `401` | No autenticado: falta el token, es inválido o expiró; o credenciales incorrectas en el login |
+| `403` | Autenticado, pero el rol no tiene permiso para ese endpoint (`No tienes permisos para esta acción`) |
 | `404` | El recurso no existe, o la ruta no existe |
+| `409` | El email ya está registrado |
+| `413` | El body supera 16kb (`Solicitud demasiado grande`) |
 | `500` | Error interno. Con `NODE_ENV=development` el campo `error` trae el detalle (p. ej. `ECONNREFUSED` si la base de datos está apagada) |
+
+Los errores de validación de los endpoints de autenticación agregan un campo `details`:
+
+```json
+{
+  "success": false,
+  "error": "Datos de entrada inválidos",
+  "details": [{ "campo": "email", "mensaje": "El formato del email no es válido" }]
+}
+```
 
 ### Autenticación
 
-Las rutas marcadas con **Auth: Sí** requieren un usuario autenticado. Cuando la auth real
-esté lista se enviará el header:
+Las rutas marcadas con **Auth: Sí** requieren el header:
 
 ```
 Authorization: Bearer <token>
 ```
 
-> **Estado actual:** la autenticación está en modo *stub*. Cualquier petición queda
-> autenticada como **vecino id 1** (`vecino@test.com`), sin token. Por eso los endpoints de
-> funcionario responden `403` por ahora. Ver [GUIA_EQUIPO.md](GUIA_EQUIPO.md#francisco--autenticación).
+El token se obtiene en [`POST /api/auth/login`](#post-apiauthlogin) o
+[`POST /api/auth/register`](#post-apiauthregister) y dura lo que indique `JWT_EXPIRES_IN`
+(24 horas por defecto). Cuando expira, el cliente debe volver a iniciar sesión.
+
+| Situación | Código | `error` |
+| --- | --- | --- |
+| Sin header, o no empieza con `Bearer ` | 401 | `Token no proporcionado` |
+| Token alterado, firmado con otra clave o con datos inválidos | 401 | `Token inválido` |
+| Token vencido | 401 | `Token expirado` |
+| Token válido pero rol incorrecto | 403 | `No tienes permisos para esta acción` |
 
 ### Valores permitidos
 
@@ -91,9 +109,9 @@ Siempre `YYYY-MM-DD`, en hora local de Chile (no UTC).
 | PATCH | `/api/solicitudes/:folio` | Sí | funcionario | Cambiar el estado |
 | GET | `/api/notificaciones` | Sí | ambos | Notificaciones del usuario |
 | PATCH | `/api/notificaciones/:id` | Sí | ambos | Marcar como leída |
-| POST | `/api/auth/register` | No | — | *Pendiente (Francisco)* |
-| POST | `/api/auth/login` | No | — | *Pendiente (Francisco)* |
-| GET | `/api/auth/me` | Sí | ambos | *Pendiente (Francisco)* |
+| POST | `/api/auth/register` | No | — | Crear cuenta y obtener token |
+| POST | `/api/auth/login` | No | — | Iniciar sesión y obtener token |
+| GET | `/api/auth/me` | Sí | ambos | Datos del usuario de la sesión |
 
 ---
 
@@ -108,6 +126,93 @@ Sirve para comprobar que el servidor está arriba. No consulta la base de datos.
 ```json
 { "success": true, "data": { "status": "ok", "timestamp": "2026-10-19T01:09:45.328Z" } }
 ```
+
+---
+
+## Autenticación
+
+### `POST /api/auth/register`
+
+Crea una cuenta y devuelve la sesión iniciada.
+
+**Body**
+
+```json
+{ "nombre": "Ana Pérez", "email": "ana@correo.cl", "password": "Secreta123" }
+```
+
+| Campo | Requerido | Regla |
+| --- | --- | --- |
+| `nombre` | Sí | Entre 2 y 120 caracteres (se recortan los espacios) |
+| `email` | Sí | Formato válido. Se recorta y se guarda en minúsculas |
+| `password` | Sí | Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número; máximo 72 bytes |
+| `rol` | No | `vecino` (por defecto) o `funcionario` |
+
+> ⚠️ Hoy el registro público permite crear cuentas `funcionario`, porque así lo pide el
+> contrato de la evaluación. En un despliegue real esa asignación debería requerir
+> autorización.
+
+**201**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": { "id": 3, "nombre": "Ana Pérez", "email": "ana@correo.cl", "rol": "vecino" },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**Errores**
+
+| Código | `error` | Causa |
+| --- | --- | --- |
+| 400 | `Datos de entrada inválidos` + `details` | Algún campo no cumple su regla |
+| 409 | `El email ya está registrado` | Ya existe una cuenta con ese correo |
+
+### `POST /api/auth/login`
+
+**Body**
+
+```json
+{ "email": "vecino@test.com", "password": "Test1234" }
+```
+
+**200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": { "id": 1, "nombre": "Vecino Demo", "email": "vecino@test.com", "rol": "vecino" },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+El cliente debe guardar `token` y enviarlo en el header `Authorization` de las siguientes
+peticiones. `user.rol` sirve para decidir a qué vista redirigir.
+
+**Errores**
+
+| Código | `error` | Causa |
+| --- | --- | --- |
+| 400 | `Datos de entrada inválidos` + `details` | Falta el email o la contraseña, o no son texto |
+| 401 | `Credenciales inválidas` | El correo no existe **o** la contraseña es incorrecta (mismo mensaje a propósito, para no revelar qué cuentas existen) |
+
+### `GET /api/auth/me`
+
+Devuelve el usuario de la sesión. Sirve para restaurar la sesión al recargar la app.
+
+**200**
+
+```json
+{ "success": true, "data": { "id": 1, "nombre": "Vecino Demo", "email": "vecino@test.com", "rol": "vecino" } }
+```
+
+**Errores**: los 401 de [autenticación](#autenticación), y **404** `Usuario no encontrado`
+si la cuenta se eliminó después de emitir el token.
 
 ---
 
@@ -219,8 +324,8 @@ envía en el body: se toma de la sesión. El folio lo genera el servidor.
 | 400 | `tramiteId es requerido` | Falta o no es texto |
 | 400 | `observaciones debe ser texto` | Se envió un valor que no es string |
 | 400 | `El trámite indicado no existe` | No existe o está inactivo |
-| 400 | `El cuerpo de la petición no es JSON válido` | JSON mal formado |
-| 403 | `No autorizado para este recurso` | El usuario es funcionario |
+| 400 | `Datos de entrada inválidos` | JSON mal formado |
+| 403 | `No tienes permisos para esta acción` | El usuario es funcionario |
 
 ### `GET /api/solicitudes`
 
@@ -314,7 +419,7 @@ resolución.
 | --- | --- | --- |
 | 400 | `estado debe ser uno de: …` | Falta o no es válido |
 | 400 | `observaciones debe ser texto` | No es string |
-| 403 | `No autorizado para este recurso` | El usuario es vecino |
+| 403 | `No tienes permisos para esta acción` | El usuario es vecino |
 | 404 | `Solicitud no encontrada` | El folio no existe |
 
 ---
@@ -391,33 +496,27 @@ PATCH /api/notificaciones/1
 
 ---
 
-## Autenticación (pendiente)
-
-Estos endpoints los implementa Francisco. El contrato propuesto, para que el frontend
-pueda prepararse, está en
-[GUIA_EQUIPO.md](GUIA_EQUIPO.md#francisco--autenticación).
-
-| Método | Ruta | Uso |
-| --- | --- | --- |
-| POST | `/api/auth/register` | Crear cuenta |
-| POST | `/api/auth/login` | Iniciar sesión y obtener el token |
-| GET | `/api/auth/me` | Datos del usuario de la sesión |
-
----
-
 ## Cómo probar la API
 
 Con el servidor levantado (`npm run dev`):
 
 **Navegador**: los `GET` públicos se abren directo, p. ej. http://localhost:3000/api/tramites.
 
-**Terminal (curl)**
+**Terminal (curl, en Git Bash)**
+
+Primero se inicia sesión y se guarda el token; después se envía en cada petición:
 
 ```bash
-curl http://localhost:3000/api/solicitudes
-curl -X POST http://localhost:3000/api/solicitudes -H "Content-Type: application/json" -d "{\"tramiteId\":\"cert-residencia\"}"
-curl -X PATCH http://localhost:3000/api/notificaciones/1
+TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"vecino@test.com","password":"Test1234"}' | node -pe "JSON.parse(require('fs').readFileSync(0)).data.token")
+
+curl http://localhost:3000/api/solicitudes -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:3000/api/solicitudes -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"tramiteId":"cert-residencia"}'
+curl -X PATCH http://localhost:3000/api/notificaciones/1 -H "Authorization: Bearer $TOKEN"
 ```
+
+Para probar como funcionario, repetir el login con `funcionario@test.com`.
 
 **Herramientas gráficas**: Postman, Insomnia, Bruno o la extensión *REST Client* / *Thunder
 Client* de VS Code.

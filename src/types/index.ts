@@ -103,24 +103,6 @@ export interface NotificacionFrontend {
   leida: boolean;
 }
 
-// --- Sesión ---
-
-/** Datos del usuario autenticado que el middleware de auth deja en `req.user`. */
-export interface UsuarioSesion {
-  id: number;
-  email: string;
-  rol: Rol;
-}
-
-/** Agrega `req.user` al Request de Express para que los controladores lo tipen. */
-declare global {
-  namespace Express {
-    interface Request {
-      user?: UsuarioSesion;
-    }
-  }
-}
-
 // --- Reportes ---
 
 export interface ResumenPorEstado {

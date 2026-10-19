@@ -8,15 +8,19 @@ import { Request, Response, NextFunction } from 'express';
  * para no filtrar detalles de la base de datos.
  */
 export const errorHandler = (
-  err: Error & { type?: string; code?: string },
+  err: Error & { status?: number; code?: string },
   _req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
-  // express.json() lanza este error cuando el body no es JSON válido: es culpa
-  // del cliente, no del servidor.
-  if (err.type === 'entity.parse.failed') {
-    res.status(400).json({ success: false, error: 'El cuerpo de la petición no es JSON válido' });
+  // express.json() marca con `status` los errores que son culpa del cliente:
+  // 413 si el body supera el límite de 16kb, 400 si no es JSON válido.
+  if (err.status === 413) {
+    res.status(413).json({ success: false, error: 'Solicitud demasiado grande' });
+    return;
+  }
+  if (err.status === 400) {
+    res.status(400).json({ success: false, error: 'Datos de entrada inválidos' });
     return;
   }
 

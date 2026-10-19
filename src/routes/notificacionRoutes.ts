@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import authMiddleware from '../middleware/authMiddleware';
+import { authMiddleware } from '../middleware/authMiddleware';
 import { listarNotificaciones, marcarLeida } from '../controllers/notificacionController';
 
 const router = Router();

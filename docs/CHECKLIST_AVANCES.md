@@ -28,12 +28,11 @@ los demás.
 | Base de datos (esquema + semilla) | ✅ Lista |
 | Capa de datos (servicios con SQL) | ✅ Lista |
 | 10 endpoints de negocio (trámites, solicitudes, reportes, notificaciones) | ✅ Listos y probados contra MariaDB |
-| Autenticación: registro, login, JWT | ⏳ Stub, la implementa Francisco |
+| Autenticación: registro, login, JWT y roles | ✅ Lista e integrada con la API de negocio |
 | Frontend consumiendo la API | ❌ El frontend aún usa datos mock |
 
-**Lo que hoy bloquea al proyecto es la autenticación.** Sin ella el frontend no puede
-iniciar sesión contra el backend, y no se pueden probar los endpoints de funcionario,
-porque el stub siempre identifica al usuario como vecino.
+**El backend está completo de punta a punta.** El siguiente paso grande es conectar el
+frontend: ver [Frontend · Conexión con la API](#frontend--conexión-con-la-api).
 
 ---
 
@@ -41,132 +40,54 @@ porque el stub siempre identifica al usuario como vecino.
 
 | Integrante | Responsabilidad | Archivos |
 | --- | --- | --- |
-| **Tomás** | Servidor, API REST de negocio (EP 2.1 y parte de EP 2.3) | `app.ts`, `server.ts`, `controllers/` (salvo auth), `routes/` (salvo auth), `middleware/errorHandler.ts`, `types/index.ts` |
+| **Tomás** | Servidor, API REST de negocio (EP 2.1 y parte de EP 2.3) | `app.ts`, `server.ts`, `controllers/` (salvo auth), `routes/` (salvo auth), `middleware/errorHandler.ts` |
 | **Simón** | Base de datos y consultas | `schema.sql`, `config/database.ts`, `services/` |
-| **Francisco** | Autenticación y autorización | `routes/authRoutes.ts`, `controllers/authController.ts`, `middleware/authMiddleware.ts`, `middleware/roleMiddleware.ts` |
+| **Francisco** | Autenticación y autorización | `config/jwt.ts`, `routes/authRoutes.ts`, `controllers/authController.ts`, `middleware/authMiddleware.ts`, `middleware/roleMiddleware.ts`, `middleware/validateRequest.ts`, `types/express.d.ts`, `tests/` |
 | **Frontend** | Interfaz Ionic + React (rama `frontend`) | Reemplazar los mocks de `src/services/` por llamadas a la API |
 
 ---
 
 ## Francisco · Autenticación
 
-### Qué existe hoy
+**Entregado** en la rama `backend-auth-jwt-francisco` e integrado con la API de negocio en
+`backend-tomas`.
 
-Cuatro archivos *stub* que dejan el proyecto compilando y funcionando:
+### Qué hace
 
-| Archivo | Qué hace hoy | Qué debe hacer |
-| --- | --- | --- |
-| `src/middleware/authMiddleware.ts` | Deja pasar todo y fija `req.user = { id: 1, email: 'dev@test.com', rol: 'vecino' }` | Verificar el JWT del header `Authorization` |
-| `src/middleware/roleMiddleware.ts` | Ya funciona: compara `req.user.rol` con el rol pedido y responde 401/403 | Puede quedar igual o mejorarse |
-| `src/routes/authRoutes.ts` | Router vacío, montado en `/api/auth` | Declarar `register`, `login` y `me` |
-| `src/controllers/authController.ts` | Vacío | Implementar los tres controladores |
+| Archivo | Qué hace |
+| --- | --- |
+| `src/config/jwt.ts` | Lee `JWT_SECRET` y `JWT_EXPIRES_IN`. **El servidor no arranca** si el secreto es corto (< 32), vacío o contiene `cambiar`, o si la duración no es positiva |
+| `src/controllers/authController.ts` | `register`, `login` y `getMe`. Hashea con bcrypt (10 rondas) y firma JWT HS256 con `{ id, email, rol }` |
+| `src/middleware/authMiddleware.ts` | Verifica el token del header `Authorization: Bearer …` y deja `req.user = { id, email, rol }` |
+| `src/middleware/roleMiddleware.ts` | `roleMiddleware('funcionario')`: 401 sin sesión, 403 con otro rol |
+| `src/middleware/validateRequest.ts` | Reglas de `express-validator` para register y login, con errores en `details` |
+| `src/routes/authRoutes.ts` | `POST /register`, `POST /login`, `GET /me` |
+| `src/types/express.d.ts` | Tipo de `req.user` para todo el proyecto |
+| `tests/auth.test.cjs` | Pruebas HTTP reales de registro, login, tokens, roles y errores (`npm test`) |
 
-**Basta con reemplazar esos archivos.** No hay que tocar `app.ts` ni las demás rutas: ya
-importan `authMiddleware` y `roleMiddleware` con estos nombres y como `export default`.
+El contrato completo de los endpoints está en [API.md](API.md#autenticación).
 
-### Lo que el resto del código espera de ti
+### Cómo se usa desde otras rutas
 
-**1. `authMiddleware` debe dejar en `req.user` exactamente esto:**
-
-```typescript
-req.user = { id: number, email: string, rol: 'vecino' | 'funcionario' };
-```
-
-El tipo ya está declarado como `UsuarioSesion` en `src/types/index.ts`, así que
-`req.user` está tipado en todo el proyecto. Los controladores leen `req.user.id` (para
-saber de quién son las solicitudes y notificaciones) y `req.user.rol`.
-
-**2. Si no hay token o es inválido**, responder sin llamar a `next()`:
-
-```json
-// 401
-{ "success": false, "error": "No autenticado" }
-```
-
-**3. Las firmas de uso no cambian:**
+Ambos middlewares se exportan **con nombre**:
 
 ```typescript
-router.use(authMiddleware);                       // sin paréntesis
-router.get('/x', roleMiddleware('funcionario'));  // recibe el rol como string
+import { authMiddleware } from '../middleware/authMiddleware';
+import { roleMiddleware } from '../middleware/roleMiddleware';
+
+router.use(authMiddleware);
+router.post('/', roleMiddleware('vecino'), crearSolicitud);
 ```
 
-### Servicios disponibles (los hizo Simón)
+### Pendientes y puntos a revisar
 
-Ojo: los nombres de tipos difieren del documento de instrucciones original. Usa estos:
-
-```typescript
-import * as userService from '../services/userService';
-import type { UsuarioDB, UsuarioPublico, Rol } from '../types';
-
-userService.createUser(nombre, email, passwordHash, rol): Promise<UsuarioPublico>
-userService.findByEmail(email): Promise<UsuarioDB | null>   // incluye password_hash
-userService.findById(id):       Promise<UsuarioPublico | null>
-```
-
-- `findByEmail` no distingue mayúsculas e incluye `password_hash`. **Nunca devolver ese
-  objeto tal cual en una respuesta**; armar uno sin el hash.
-- `createUser` lanza un error de MySQL con `code === 'ER_DUP_ENTRY'` si el correo ya
-  existe. Conviene atraparlo y responder `409` (o `400`) en vez de dejarlo llegar al 500.
-- `findById` sirve para confirmar en `/me` que el usuario del token sigue existiendo.
-
-### Dependencias ya instaladas
-
-`jsonwebtoken`, `bcrypt`, `express-validator` y sus tipos. El `JWT_SECRET` y el
-`JWT_EXPIRES_IN` se leen de `.env`.
-
-Las cuentas semilla (`vecino@test.com` y `funcionario@test.com`, contraseña `Test1234`)
-tienen hash bcrypt de 10 rondas, así que `bcrypt.compare('Test1234', password_hash)` debe
-dar `true`.
-
-### Contrato propuesto para los endpoints
-
-Es una propuesta para que el frontend pueda prepararse. Si Francisco decide otra forma,
-basta con actualizar esta sección.
-
-**`POST /api/auth/register`**
-
-```json
-// body
-{ "nombre": "Ana Pérez", "email": "ana@correo.cl", "password": "Secreta123" }
-
-// 201
-{ "success": true, "data": { "token": "eyJ...", "user": { "id": 3, "nombre": "Ana Pérez", "email": "ana@correo.cl", "rol": "vecino" } } }
-```
-
-Recomendación: el registro público crea siempre **vecinos**. Si el body trae
-`"rol": "funcionario"`, cualquiera podría darse permisos de funcionario.
-
-**`POST /api/auth/login`**
-
-```json
-// body
-{ "email": "vecino@test.com", "password": "Test1234" }
-
-// 200
-{ "success": true, "data": { "token": "eyJ...", "user": { "id": 1, "nombre": "Vecino Demo", "email": "vecino@test.com", "rol": "vecino" } } }
-
-// 401: mismo mensaje si el correo no existe o la contraseña es incorrecta
-{ "success": false, "error": "Credenciales inválidas" }
-```
-
-**`GET /api/auth/me`** (con `authMiddleware`)
-
-```json
-// 200
-{ "success": true, "data": { "id": 1, "nombre": "Vecino Demo", "email": "vecino@test.com", "rol": "vecino" } }
-```
-
-**Payload sugerido del JWT:** `{ id, email, rol }`. Es justo lo que necesita `req.user`,
-así el middleware no tiene que consultar la base de datos en cada petición.
-
-### Cómo comprobar que quedó bien
-
-1. `npm run typecheck` sin errores.
-2. Sin token: `GET /api/solicitudes` → `401`.
-3. Con el token del vecino: `GET /api/solicitudes` → sus 5 solicitudes, y
-   `GET /api/solicitudes/reportes` → `403`.
-4. Con el token del funcionario: `GET /api/solicitudes/reportes` → `200`, y
-   `PATCH /api/solicitudes/SOL-1001` con `{"estado":"en_revision"}` → `200`.
+- **Registro de funcionarios:** `POST /register` acepta `"rol": "funcionario"`, así que
+  cualquiera puede crearse una cuenta con permisos de funcionario. Francisco lo dejó así
+  porque lo pide el contrato de la evaluación, y lo documentó. Para un uso real habría que
+  restringirlo (p. ej. que solo un funcionario pueda crear otro).
+- **Pruebas sin MySQL:** las pruebas reemplazan `userService` por memoria. El login contra
+  la base real se verificó manualmente con las cuentas semilla (ver
+  [Tomás · Verificado](#verificado)).
 
 ---
 
@@ -247,8 +168,9 @@ componentes no deberían cambiar de forma.
 | `getNotificaciones()` | `GET /api/notificaciones` | |
 | — | `PATCH /api/notificaciones/:id` | Nuevo: marcar como leída |
 | `getResumenPorEstado()` | `GET /api/solicitudes/reportes` | Mismo formato `Record<EstadoSolicitud, number>` |
-| `loginRequest(email, password)` | `POST /api/auth/login` | Pendiente de Francisco. Guardar el **token**, no solo el usuario |
-| `registerRequest(datos)` | `POST /api/auth/register` | Pendiente de Francisco |
+| `loginRequest(email, password)` | `POST /api/auth/login` | Responde `{ user, token }`. Guardar el **token**, no solo el usuario. 401 `Credenciales inválidas` |
+| `registerRequest(datos)` | `POST /api/auth/register` | Responde `{ user, token }`, ya con sesión iniciada. 400 con `details` por campo, 409 si el email existe |
+| `recuperarSesion()` | `GET /api/auth/me` | Con el token guardado, confirma que la sesión sigue válida al recargar la app |
 
 Los mocks actuales son **síncronos**. Al conectarlos a la API pasan a devolver
 `Promise`, así que los componentes que hoy los llaman directamente tendrán que usar
@@ -257,6 +179,10 @@ Los mocks actuales son **síncronos**. Al conectarlos a la API pasan a devolver
 ### Diferencias de detalle
 
 - `User.id` en el frontend es string (`'u-1'`); la API lo entrega como **número** (`1`).
+- Las reglas de contraseña del backend (8+ caracteres, mayúscula, minúscula y número) son
+  más estrictas que las del mock: conviene alinear `src/utils/validators.ts`.
+- Si una petición responde 401 (`Token expirado` o `Token inválido`), limpiar la sesión y
+  enviar al login.
 - `Notificacion.id` sí viene como string, igual que en el frontend.
 - `observaciones` se omite del JSON cuando está vacía, compatible con el `?` opcional
   del tipo.
@@ -321,21 +247,23 @@ Referencia completa de los endpoints: [API.md](API.md).
 ### Entregado
 
 - Proyecto Express 5 + TypeScript con scripts `dev`, `build`, `start` y `typecheck`.
-- `app.ts`: CORS, parseo de JSON, `/api/health`, montaje de rutas, 404 para rutas
-  inexistentes y manejador global de errores.
-- `errorHandler`: 400 si el JSON viene mal formado, 500 en lo demás; el detalle solo se
-  muestra en desarrollo.
+- `app.ts`: CORS, parseo de JSON (límite 16kb), `/api/health`, montaje de rutas, 404 para
+  rutas inexistentes y manejador global de errores.
+- `errorHandler`: 400 si el JSON viene mal formado, 413 si el body es demasiado grande, 500
+  en lo demás; el detalle solo se muestra en desarrollo.
 - Controladores y rutas de trámites, solicitudes, reportes y notificaciones.
 - Validaciones de entrada: `tramiteId` existente, `estado` válido (en el body y en
   `?estado=`), `observaciones` de tipo texto e ids numéricos estrictos.
-- Stubs de Francisco para que el proyecto compile.
-- Tipo `req.user` (`UsuarioSesion`) declarado para todo Express.
+- Integración con la auth de Francisco: las rutas usan sus `authMiddleware` y
+  `roleMiddleware`, y `app.ts` combina lo de ambos (CORS y rutas de negocio, más
+  `x-powered-by` deshabilitado y límite de 16kb).
 
 ### Verificado
 
-Probado contra MariaDB 10.4 (XAMPP) con los datos semilla: los 10 endpoints, con sus
-casos de éxito, 400, 403 y 404. Los endpoints de funcionario se probaron montando los
-mismos controladores con un usuario funcionario, sin modificar el stub.
+Probado contra MariaDB 10.4 (XAMPP) con los datos semilla y **tokens JWT reales**
+obtenidos con `POST /api/auth/login` para ambas cuentas de prueba: los 10 endpoints de
+negocio y los 3 de auth, con sus casos de éxito, 400, 401, 403 y 404. Además pasa
+`npm test`.
 
 ### Próximos pasos posibles
 
@@ -350,7 +278,7 @@ mismos controladores con un usuario funcionario, sin modificar el stub.
 
 | # | Problema | Impacto | Responsable |
 | --- | --- | --- | --- |
-| 1 | Sin auth real, todo usuario es "vecino id 1" | No se pueden probar las rutas de funcionario ni conectar el login del frontend | Francisco |
+| 1 | El registro público acepta `rol: funcionario` | Cualquiera puede crearse una cuenta con permisos de funcionario | Francisco (decisión del equipo) |
 | 2 | `GET /solicitudes/:folio` no verifica que la solicitud sea del vecino | Un vecino puede ver solicitudes ajenas | Simón + Tomás |
 | 3 | `PATCH /notificaciones/:id` no verifica el dueño | Un usuario puede marcar notificaciones ajenas | Simón + Tomás |
 | 4 | Folio por `MAX(id)+1` | Posible 500 en creaciones simultáneas | Simón |
@@ -366,24 +294,26 @@ Diferencias con el documento de instrucciones original, y por qué:
 | Instrucción original | Lo que se hizo | Motivo |
 | --- | --- | --- |
 | Crear stubs con mocks en `services/` y `config/database.ts` | **No se crearon** | Simón ya había entregado las versiones reales; los stubs las habrían sobrescrito |
-| Tipos `User`, `Solicitud`, `Notificacion` en `types/index.ts` | Se mantuvieron los de Simón (`UsuarioPublico`, `SolicitudFrontend`, `NotificacionFrontend`, …) y se agregó `UsuarioSesion` para `req.user` | Los servicios ya dependen de ellos; cambiarlos habría roto la capa de datos |
+| Tipos `User`, `Solicitud`, `Notificacion` en `types/index.ts` | Se mantuvieron los de Simón (`UsuarioPublico`, `SolicitudFrontend`, `NotificacionFrontend`, …) y `req.user` se tipa en `types/express.d.ts` (de Francisco) | Los servicios ya dependen de ellos; cambiarlos habría roto la capa de datos |
 | `GET/PATCH /solicitudes/:id` con `parseInt` | Se usa el **folio** (`SOL-1001`) | Los servicios buscan por folio, y el frontend identifica las solicitudes por folio |
 | Folio con `Date.now() % 10000` | `solicitudService.generarFolio()` | La versión original se repite cada 10 segundos; la de Simón es correlativa |
 | `POST /solicitudes` sin restricción de rol en el código | `roleMiddleware('vecino')` | La tabla de endpoints del mismo documento dice que es solo para vecinos |
 | — | Comprobar que el trámite existe antes de crear la solicitud | Si no, la clave foránea falla y el cliente recibe un 500 en vez de un 400 |
-| — | Respuesta 404 para rutas inexistentes y 400 para JSON mal formado | Mantener el formato `{ success, error }` en todos los casos |
-| — | `"ts-node": { "files": true }` en `tsconfig.json` | Para que `ts-node` cargue la declaración global de `req.user` |
+| — | Respuesta 404 para rutas inexistentes, 400 para JSON mal formado y 413 para bodies grandes | Mantener el formato `{ success, error }` en todos los casos. Los mensajes coinciden con los que esperan las pruebas de Francisco |
+| Middlewares de auth con `export default` | Se exportan con nombre (`{ authMiddleware }`), como los entregó Francisco | Su implementación y sus pruebas los usan así; las rutas de negocio se adaptaron |
+| — | `"ts-node": { "files": true }` en `tsconfig.json` | Para que `ts-node` (usado por `npm run dev`) cargue `types/express.d.ts` |
+| `dev` con nodemon + ts-node | Se mantuvo; Francisco usaba `tsx watch` | Decisión del equipo de seguir las instrucciones. Ambos funcionan |
 
 ---
 
 ## Flujo de trabajo con Git
 
 ```
-branch-<persona>  ──PR──▶  backend  ──PR──▶  main
+backend-<persona>  ──PR──▶  backend  ──PR──▶  main
 ```
 
 1. Cada integrante trabaja en su rama personal **creada desde `backend`**.
-2. Antes de subir: `npm run typecheck` sin errores y `npm run dev` arrancando.
+2. Antes de subir: `npm run typecheck` y `npm test` sin errores, y `npm run dev` arrancando.
 3. Se sube la rama y se abre un Pull Request hacia `backend`. En la descripción conviene
    enlazar la sección de esta guía que corresponde.
 4. Al recibir cambios de otros: `git pull origin backend` en la rama personal.
