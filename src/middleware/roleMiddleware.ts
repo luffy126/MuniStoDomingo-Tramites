@@ -1,18 +1,15 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
-// TODO: Francisco reemplazará esto con la verificación real de rol
-const roleMiddleware = (rol: string) => {
+export const roleMiddleware = (rolRequerido: string) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({ success: false, error: 'No autenticado' });
       return;
     }
-    if (req.user.rol !== rol) {
-      res.status(403).json({ success: false, error: 'No autorizado para este recurso' });
+    if (req.user.rol !== rolRequerido) {
+      res.status(403).json({ success: false, error: 'No tienes permisos para esta acción' });
       return;
     }
     next();
   };
 };
-
-export default roleMiddleware;

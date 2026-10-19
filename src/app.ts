@@ -1,22 +1,21 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import tramiteRoutes from './routes/tramiteRoutes';
 import solicitudRoutes from './routes/solicitudRoutes';
 import notificacionRoutes from './routes/notificacionRoutes';
 import authRoutes from './routes/authRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
-dotenv.config();
-
 const app = express();
 
 // ── Middlewares globales ──────────────────────────
+app.disable('x-powered-by');
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:8100',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '16kb' }));
 
 // ── Ruta de health check ─────────────────────────
 app.get('/api/health', (_req, res) => {

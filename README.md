@@ -54,11 +54,14 @@ npm run dev
 Si todo está bien la consola muestra `✅ Servidor corriendo en http://localhost:3000`, y
 http://localhost:3000/api/health responde `{ "success": true, "data": { "status": "ok", ... } }`.
 
-Para generar un `JWT_SECRET` seguro:
+**El servidor no arranca si `JWT_SECRET` está vacío, tiene menos de 32 caracteres o
+contiene el texto `cambiar`** (el placeholder de `.env.example`). Para generar uno:
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 ```
+
+`JWT_EXPIRES_IN` acepta una duración como `24h` o segundos enteros, y debe ser positiva.
 
 ### Scripts
 
@@ -66,6 +69,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | --- | --- |
 | `npm run dev` | Levanta el servidor con `ts-node` y lo reinicia con `nodemon` al guardar cambios en `src/` |
 | `npm run typecheck` | Revisa los tipos sin generar archivos. Debe pasar antes de abrir un PR |
+| `npm test` | Compila y ejecuta las pruebas de autenticación (`tests/`). No necesitan MySQL |
 | `npm run build` | Compila TypeScript a `dist/` |
 | `npm start` | Ejecuta la versión compilada (`dist/server.js`) |
 
@@ -105,7 +109,8 @@ MySQL / MariaDB
 ```
 
 Los errores no esperados de cualquier capa llegan a `middleware/errorHandler.ts`, que
-responde 500 con el formato estándar.
+responde con el formato estándar: 400 si el body no es JSON válido, 413 si supera 16kb y
+500 en cualquier otro caso.
 
 ### Estructura
 
@@ -113,32 +118,57 @@ responde 500 con el formato estándar.
 src/
 ├── server.ts                      Punto de entrada: levanta el servidor en PORT
 ├── app.ts                         Express: CORS, JSON, rutas, 404 y manejo de errores
-├── config/database.ts             Pool de conexiones a MySQL                      (Simón)
-├── types/index.ts                 Tipos compartidos, req.user y formateo de fechas
+├── config/
+│   ├── database.ts                Pool de conexiones a MySQL                      (Simón)
+│   └── jwt.ts                     Secreto y opciones JWT, validados al arrancar   (Francisco)
+├── types/
+│   ├── index.ts                   Tipos compartidos y formateo de fechas          (Simón)
+│   └── express.d.ts               Tipo de req.user                                (Francisco)
 ├── routes/
-│   ├── authRoutes.ts              STUB: /api/auth                                 (Francisco)
+│   ├── authRoutes.ts              /api/auth                                       (Francisco)
 │   ├── tramiteRoutes.ts           /api/tramites                                   (Tomás)
 │   ├── solicitudRoutes.ts         /api/solicitudes y /api/solicitudes/reportes   (Tomás)
 │   └── notificacionRoutes.ts      /api/notificaciones                             (Tomás)
 ├── controllers/
-│   ├── authController.ts          STUB                                            (Francisco)
+│   ├── authController.ts          register, login, me                             (Francisco)
 │   ├── tramiteController.ts                                                       (Tomás)
 │   ├── solicitudController.ts                                                     (Tomás)
 │   └── notificacionController.ts                                                  (Tomás)
 ├── middleware/
-│   ├── authMiddleware.ts          STUB: siempre autentica como vecino id 1        (Francisco)
-│   ├── roleMiddleware.ts          STUB funcional: compara req.user.rol            (Francisco)
+│   ├── authMiddleware.ts          Verifica el JWT y deja req.user                 (Francisco)
+│   ├── roleMiddleware.ts          Exige un rol: 401 sin sesión, 403 rol incorrecto (Francisco)
+│   ├── validateRequest.ts         Validaciones de register y login                (Francisco)
 │   └── errorHandler.ts            Manejo global de errores                        (Tomás)
 └── services/                      Acceso a datos                                  (Simón)
     ├── userService.ts
     ├── tramiteService.ts
     ├── solicitudService.ts
     └── notificacionService.ts
+tests/
+└── auth.test.cjs                  Pruebas HTTP de autenticación y roles           (Francisco)
 ```
 
-Los archivos marcados **STUB** existen para que el proyecto compile y se pueda probar
-mientras su dueño los implementa. Se reemplazan completos sin tocar ningún otro archivo:
-ver [docs/GUIA_EQUIPO.md](docs/GUIA_EQUIPO.md).
+### Autenticación y roles
+
+Los endpoints protegidos esperan el header `Authorization: Bearer <token>`. El token se
+obtiene en `POST /api/auth/login` o `POST /api/auth/register`.
+
+```typescript
+import { authMiddleware } from '../middleware/authMiddleware';
+import { roleMiddleware } from '../middleware/roleMiddleware';
+
+router.use(authMiddleware);                                   // exige sesión
+router.get('/reportes', roleMiddleware('funcionario'), ...);  // exige además un rol
+```
+
+- `authMiddleware` valida firma (HS256), expiración y contenido del token, y deja
+  `req.user = { id, email, rol }`. Sin token o con uno inválido responde 401.
+- `roleMiddleware(rol)` va después de `authMiddleware` y responde 403 si el rol no coincide.
+- Las contraseñas se guardan con bcrypt de 10 rondas. Los hashes nunca forman parte de una
+  respuesta.
+
+El detalle de los endpoints de auth (validaciones, mensajes de error) está en
+[docs/API.md](docs/API.md#autenticación).
 
 ### Reglas de cada capa
 
@@ -164,10 +194,12 @@ Todas las respuestas usan el mismo sobre:
 | --- | --- |
 | `200` | Consulta o actualización exitosa |
 | `201` | Recurso creado |
-| `400` | Datos de entrada inválidos o faltantes, o JSON mal formado |
-| `401` | No autenticado |
+| `400` | Datos de entrada inválidos o faltantes, o JSON mal formado. Las validaciones de auth agregan `details: [{ campo, mensaje }]` |
+| `401` | No autenticado: falta el token, es inválido o expiró; o credenciales incorrectas en el login |
 | `403` | Autenticado pero con un rol que no tiene permiso |
 | `404` | Recurso o ruta inexistente |
+| `409` | El email ya está registrado |
+| `413` | El body supera 16kb |
 | `500` | Error interno (en desarrollo incluye el detalle, en producción no) |
 
 La lista completa de endpoints, con ejemplos, está en [docs/API.md](docs/API.md).
@@ -214,8 +246,8 @@ Ambas con la contraseña `Test1234`, almacenada como hash bcrypt:
 
 ## Cómo contribuir
 
-1. Cada integrante trabaja en su rama personal (`branch-tomas`, `branch-xopan`, …) creada
-   **a partir de `backend`**.
-2. Antes de subir: `npm run typecheck` sin errores y `npm run dev` arrancando.
+1. Cada integrante trabaja en su rama personal (`backend-tomas`,
+   `backend-auth-jwt-francisco`, …) creada **a partir de `backend`**.
+2. Antes de subir: `npm run typecheck` y `npm test` sin errores, y `npm run dev` arrancando.
 3. Se sube la rama personal y se abre un Pull Request hacia `backend`.
 4. Nunca se suben `.env`, `node_modules/` ni `dist/` (ya están en `.gitignore`).

@@ -1,6 +1,9 @@
 import app from './app';
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = Number(process.env.PORT || 3000);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+  throw new Error('PORT debe ser un puerto válido');
+}
 
 app.listen(PORT, () => {
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
