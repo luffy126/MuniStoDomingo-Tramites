@@ -1,4 +1,4 @@
-# Guía del equipo: estado del backend y próximos pasos
+# Checklist de avances: estado del backend y próximos pasos
 
 Este documento dice **qué está listo, qué falta y qué le toca a cada uno**, con el detalle
 necesario para que cada integrante pueda tomar su parte sin tener que leer el código de
@@ -145,8 +145,8 @@ solicitud: el mismo dato del punto 1.
 
 ### Situación actual
 
-La rama `frontend` funciona **100 % con datos mock**: `src/services/tramiteService.ts`
-usa arreglos en memoria y `src/services/authService.ts` guarda la sesión en
+La rama `frontend` funciona **100 % con datos mock**: su `src/services/tramiteService.ts`
+usa arreglos en memoria y su `src/services/authService.ts` guarda la sesión en
 `localStorage`. No hay ninguna llamada HTTP.
 
 La buena noticia: **los tipos coinciden** con lo que devuelve la API (`Tramite`,
@@ -180,7 +180,7 @@ Los mocks actuales son **síncronos**. Al conectarlos a la API pasan a devolver
 
 - `User.id` en el frontend es string (`'u-1'`); la API lo entrega como **número** (`1`).
 - Las reglas de contraseña del backend (8+ caracteres, mayúscula, minúscula y número) son
-  más estrictas que las del mock: conviene alinear `src/utils/validators.ts`.
+  más estrictas que las del mock: conviene alinear `src/utils/validators.ts` de la rama `frontend`.
 - Si una petición responde 401 (`Token expirado` o `Token inválido`), limpiar la sesión y
   enviar al login.
 - `Notificacion.id` sí viene como string, igual que en el frontend.
@@ -315,7 +315,7 @@ backend-<persona>  ──PR──▶  backend  ──PR──▶  main
 1. Cada integrante trabaja en su rama personal **creada desde `backend`**.
 2. Antes de subir: `npm run typecheck` y `npm test` sin errores, y `npm run dev` arrancando.
 3. Se sube la rama y se abre un Pull Request hacia `backend`. En la descripción conviene
-   enlazar la sección de esta guía que corresponde.
+   enlazar la sección de este checklist que corresponde.
 4. Al recibir cambios de otros: `git pull origin backend` en la rama personal.
 
 Si un clon solo trae la rama `backend` (`git branch -r` no muestra las demás), se arregla

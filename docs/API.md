@@ -54,7 +54,7 @@ Los errores de validación de los endpoints de autenticación agregan un campo `
 }
 ```
 
-### Autenticación
+### Autenticación en las peticiones
 
 Las rutas marcadas con **Auth: Sí** requieren el header:
 
@@ -91,7 +91,7 @@ El token se obtiene en [`POST /api/auth/login`](#post-apiauthlogin) o
 
 ### Fechas
 
-Siempre `YYYY-MM-DD`, en hora local de Chile (no UTC).
+Siempre `YYYY-MM-DD`, en la zona horaria del servidor (no UTC). En Chile corresponde a la hora local.
 
 ---
 
@@ -211,7 +211,7 @@ Devuelve el usuario de la sesión. Sirve para restaurar la sesión al recargar l
 { "success": true, "data": { "id": 1, "nombre": "Vecino Demo", "email": "vecino@test.com", "rol": "vecino" } }
 ```
 
-**Errores**: los 401 de [autenticación](#autenticación), y **404** `Usuario no encontrado`
+**Errores**: los 401 de [autenticación](#autenticación-en-las-peticiones), y **404** `Usuario no encontrado`
 si la cuenta se eliminó después de emitir el token.
 
 ---
@@ -392,7 +392,7 @@ GET /api/solicitudes/SOL-1003
 **404** `{ "success": false, "error": "Solicitud no encontrada" }`
 
 > ⚠️ Hoy no se verifica que la solicitud pertenezca al vecino que la consulta. Ver
-> [pendientes](GUIA_EQUIPO.md#problemas-conocidos).
+> [pendientes](CHECKLIST_AVANCES.md#problemas-conocidos).
 
 ### `PATCH /api/solicitudes/:folio`
 
@@ -492,7 +492,7 @@ PATCH /api/notificaciones/1
 | 404 | `Notificación no encontrada` | No existe |
 
 > ⚠️ Hoy no se verifica que la notificación pertenezca al usuario. Ver
-> [pendientes](GUIA_EQUIPO.md#problemas-conocidos).
+> [pendientes](CHECKLIST_AVANCES.md#problemas-conocidos).
 
 ---
 

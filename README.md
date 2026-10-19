@@ -177,7 +177,8 @@ El detalle de los endpoints de auth (validaciones, mensajes de error) está en
   datos suba para que lo maneje el middleware de errores. Todas las consultas son
   parametrizadas con `?`, nunca por concatenación de texto.
 - **Controladores**: validan lo que llega del cliente, llaman a los servicios y responden.
-  Todo error inesperado se pasa a `next(err)`. No escriben SQL.
+  Los errores inesperados de la API de negocio se pasan a `next(err)`; los de autenticación
+  responden directamente un 500 genérico. No escriben SQL.
 - **Rutas**: solo declaran URL, método, middlewares y controlador. Las rutas fijas (como
   `/reportes`) van antes de las que tienen parámetros (`/:id`).
 
