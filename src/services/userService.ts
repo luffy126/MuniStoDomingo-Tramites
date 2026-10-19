@@ -2,6 +2,9 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import pool from '../config/database';
 import { Rol, UsuarioDB, UsuarioPublico } from '../types';
 
+export type { Rol } from '../types';
+export type User = UsuarioPublico;
+
 /**
  * Crea un nuevo usuario.
  *
