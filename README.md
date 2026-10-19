@@ -10,7 +10,7 @@ está en la rama `frontend`.
 | --- | --- | --- |
 | Este README | Todos | Cómo levantar el backend, estructura y convenciones |
 | [docs/API.md](docs/API.md) | Frontend, backend, evaluación | Referencia de cada endpoint con ejemplos de petición y respuesta |
-| [docs/GUIA_EQUIPO.md](docs/GUIA_EQUIPO.md) | Cada integrante | Qué está listo, qué falta, qué le toca a cada rol y cómo integrarlo |
+| [docs/CHECKLIST_AVANCES.md](docs/CHECKLIST_AVANCES.md) | Cada integrante | Qué está listo, qué falta, qué le toca a cada rol y cómo integrarlo |
 
 ## Stack
 
