@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import pool from '../config/database';
 import {
@@ -46,25 +47,46 @@ function toFrontend(fila: FilaSolicitud): SolicitudFrontend {
 /**
  * Registra una nueva solicitud de un vecino.
  *
- * @param folio Folio único, generado con `generarFolio()`.
+ * El folio se deriva del id autoincremental (`SOL-` + 1000 + id), así dos
+ * creaciones simultáneas nunca coinciden. Para eso se inserta primero con un
+ * folio temporal único y se reemplaza por el definitivo dentro de la misma
+ * transacción; nadie ve la fila con el folio temporal.
+ *
  * @param tramiteId Identificador del trámite solicitado.
  * @param vecinoId Id del vecino que inicia el trámite.
  * @param observaciones Comentario opcional del vecino.
  * @returns La solicitud creada en formato frontend.
  */
 export async function create(
-  folio: string,
   tramiteId: string,
   vecinoId: number,
   observaciones?: string
 ): Promise<SolicitudFrontend> {
-  await pool.execute<ResultSetHeader>(
-    'INSERT INTO solicitud (folio, tramite_id, vecino_id, observaciones) VALUES (?, ?, ?, ?)',
-    [folio, tramiteId, vecinoId, observaciones ?? null]
-  );
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  const [rows] = await pool.execute<FilaSolicitud[]>(`${BASE_SELECT} WHERE s.folio = ?`, [folio]);
-  return toFrontend(rows[0]);
+    const folioTemporal = `TMP-${randomBytes(8).toString('hex')}`;
+    const [result] = await conn.execute<ResultSetHeader>(
+      'INSERT INTO solicitud (folio, tramite_id, vecino_id, observaciones) VALUES (?, ?, ?, ?)',
+      [folioTemporal, tramiteId, vecinoId, observaciones ?? null]
+    );
+
+    const folio = `SOL-${1000 + result.insertId}`;
+    await conn.execute('UPDATE solicitud SET folio = ? WHERE id = ?', [folio, result.insertId]);
+
+    const [rows] = await conn.execute<FilaSolicitud[]>(`${BASE_SELECT} WHERE s.id = ?`, [
+      result.insertId,
+    ]);
+    await conn.commit();
+    return toFrontend(rows[0]);
+  } catch (err) {
+    // Si el rollback también falla (conexión caída) se conserva el error original.
+    await conn.rollback().catch(() => undefined);
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 /**
@@ -181,17 +203,20 @@ export async function getResumenPorEstado(): Promise<ResumenPorEstado> {
 }
 
 /**
- * Calcula el siguiente folio disponible con el formato SOL-XXXX.
+ * Devuelve el id del vecino dueño de una solicitud. Se usa para autorizar el
+ * acceso sin exponer `vecino_id` en el formato del frontend.
  *
- * Se apoya en el mayor id de la tabla, de modo que el primer folio sea
- * SOL-1001 cuando la tabla está vacía.
+ * @param folio Folio de la solicitud.
+ * @returns El id del vecino o null si el folio no existe.
  */
-export async function generarFolio(): Promise<string> {
-  interface FilaMax extends RowDataPacket {
-    maxId: number | null;
+export async function getOwnerId(folio: string): Promise<number | null> {
+  interface FilaOwner extends RowDataPacket {
+    vecino_id: number;
   }
 
-  const [rows] = await pool.execute<FilaMax[]>('SELECT MAX(id) AS maxId FROM solicitud');
-  const maxId = rows[0]?.maxId ?? 0;
-  return `SOL-${1000 + Number(maxId) + 1}`;
+  const [rows] = await pool.execute<FilaOwner[]>(
+    'SELECT vecino_id FROM solicitud WHERE folio = ?',
+    [folio]
+  );
+  return rows.length === 0 ? null : rows[0].vecino_id;
 }

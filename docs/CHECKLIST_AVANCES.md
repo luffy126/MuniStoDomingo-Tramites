@@ -81,10 +81,8 @@ router.post('/', roleMiddleware('vecino'), crearSolicitud);
 
 ### Pendientes y puntos a revisar
 
-- **Registro de funcionarios:** `POST /register` acepta `"rol": "funcionario"`, así que
-  cualquiera puede crearse una cuenta con permisos de funcionario. Francisco lo dejó así
-  porque lo pide el contrato de la evaluación, y lo documentó. Para un uso real habría que
-  restringirlo (p. ej. que solo un funcionario pueda crear otro).
+- **Registro de funcionarios:** `POST /register` ignora `rol` y siempre crea un `vecino`.
+  Las cuentas de funcionario se crean directo en la base de datos.
 - **Pruebas sin MySQL:** las pruebas reemplazan `userService` por memoria. El login contra
   la base real se verificó manualmente con las cuentas semilla (ver
   [Tomás · Verificado](#verificado)).
@@ -96,34 +94,16 @@ router.post('/', roleMiddleware('vecino'), crearSolicitud);
 Tu parte está entregada y funcionando: los controladores usan los servicios tal cual, sin
 cambiarles ninguna firma. Quedan estos pendientes, en orden de importancia:
 
-### 1. Verificar el dueño de solicitudes y notificaciones (seguridad)
+### 1. Verificar el dueño de solicitudes y notificaciones ✅
 
-Hoy un vecino puede ver la solicitud de otro (`GET /api/solicitudes/SOL-XXXX`) y marcar
-como leída la notificación de otro (`PATCH /api/notificaciones/:id`). El controlador no
-lo puede impedir porque **los servicios no le dicen de quién es el recurso**:
-`SolicitudFrontend` no incluye `vecinoId`, y `markAsRead` no filtra por usuario.
+Resuelto: `solicitudService.getOwnerId(folio)` permite que `obtenerSolicitud` responda `404`
+a un vecino que pide una solicitud ajena, y `notificacionService.markAsRead(id, usuarioId)`
+filtra por dueño dentro del `UPDATE`.
 
-Propuesta, a coordinar con Tomás:
+### 2. Folio duplicado en creaciones simultáneas ✅
 
-```typescript
-// solicitudService: agregar el dueño, sin exponerlo al frontend
-export async function getOwnerId(folio: string): Promise<number | null>;
-
-// notificacionService: filtrar por usuario dentro del UPDATE
-export async function markAsRead(id: number, usuarioId: number): Promise<boolean>;
-//   UPDATE notificacion SET leida = TRUE WHERE id = ? AND usuario_id = ?
-```
-
-Con eso Tomás agrega la verificación en los controladores. Al vecino se le respondería
-`404` en vez de `403`, para no revelar que el folio existe.
-
-### 2. Folio duplicado en creaciones simultáneas
-
-`generarFolio()` calcula `MAX(id) + 1`. Si dos vecinos crean una solicitud en el mismo
-instante, ambos pueden obtener el mismo folio, y la segunda inserción falla con un 500
-(`folio` es `UNIQUE`). Con pocos usuarios es improbable. Opciones: insertar primero y
-derivar el folio del `insertId` dentro de una transacción, o reintentar ante
-`ER_DUP_ENTRY`.
+Resuelto: `solicitudService.create` inserta con un folio temporal y lo reemplaza por
+`SOL-(1000 + insertId)` dentro de una transacción, así que ya no hay `MAX(id)+1`.
 
 ### 3. `seed.sql` separado
 
@@ -267,8 +247,6 @@ negocio y los 3 de auth, con sus casos de éxito, 400, 401, 403 y 404. Además p
 
 ### Próximos pasos posibles
 
-- Verificación de dueño en solicitudes y notificaciones, cuando Simón exponga el dato
-  (ver [Problemas conocidos](#problemas-conocidos)).
 - Documentación interactiva con Swagger UI en `/api/docs` (opcional).
 - Notificación automática al cambiar el estado de una solicitud.
 
@@ -278,12 +256,8 @@ negocio y los 3 de auth, con sus casos de éxito, 400, 401, 403 y 404. Además p
 
 | # | Problema | Impacto | Responsable |
 | --- | --- | --- | --- |
-| 1 | El registro público acepta `rol: funcionario` | Cualquiera puede crearse una cuenta con permisos de funcionario | Francisco (decisión del equipo) |
-| 2 | `GET /solicitudes/:folio` no verifica que la solicitud sea del vecino | Un vecino puede ver solicitudes ajenas | Simón + Tomás |
-| 3 | `PATCH /notificaciones/:id` no verifica el dueño | Un usuario puede marcar notificaciones ajenas | Simón + Tomás |
-| 4 | Folio por `MAX(id)+1` | Posible 500 en creaciones simultáneas | Simón |
-| 5 | `schema.sql` no se puede ejecutar dos veces | Para reiniciar la semilla hay que borrar la base primero | Simón |
-| 6 | `FRONTEND_URL` por defecto es `:8100` y Vite usa `:5173` | Errores de CORS al conectar el frontend | Quien conecte el frontend |
+| 1 | `schema.sql` no se puede ejecutar dos veces | Para reiniciar la semilla hay que borrar la base primero | Simón |
+| 2 | `FRONTEND_URL` por defecto es `:8100` y Vite usa `:5173` | Errores de CORS al conectar el frontend | Quien conecte el frontend |
 
 ---
 
@@ -296,7 +270,7 @@ Diferencias con el documento de instrucciones original, y por qué:
 | Crear stubs con mocks en `services/` y `config/database.ts` | **No se crearon** | Simón ya había entregado las versiones reales; los stubs las habrían sobrescrito |
 | Tipos `User`, `Solicitud`, `Notificacion` en `types/index.ts` | Se mantuvieron los de Simón (`UsuarioPublico`, `SolicitudFrontend`, `NotificacionFrontend`, …) y `req.user` se tipa en `types/express.d.ts` (de Francisco) | Los servicios ya dependen de ellos; cambiarlos habría roto la capa de datos |
 | `GET/PATCH /solicitudes/:id` con `parseInt` | Se usa el **folio** (`SOL-1001`) | Los servicios buscan por folio, y el frontend identifica las solicitudes por folio |
-| Folio con `Date.now() % 10000` | `solicitudService.generarFolio()` | La versión original se repite cada 10 segundos; la de Simón es correlativa |
+| Folio con `Date.now() % 10000` | Folio derivado del `insertId` en `solicitudService.create` | La versión original se repite cada 10 segundos; la nueva es correlativa y no colisiona |
 | `POST /solicitudes` sin restricción de rol en el código | `roleMiddleware('vecino')` | La tabla de endpoints del mismo documento dice que es solo para vecinos |
 | — | Comprobar que el trámite existe antes de crear la solicitud | Si no, la clave foránea falla y el cliente recibe un 500 en vez de un 400 |
 | — | Respuesta 404 para rutas inexistentes, 400 para JSON mal formado y 413 para bodies grandes | Mantener el formato `{ success, error }` en todos los casos. Los mensajes coinciden con los que esperan las pruebas de Francisco |

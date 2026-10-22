@@ -64,15 +64,16 @@ export async function getByUsuario(usuarioId: number): Promise<NotificacionFront
 }
 
 /**
- * Marca una notificación como leída.
+ * Marca una notificación como leída, solo si pertenece al usuario indicado.
  *
  * @param id Id numérico de la notificación.
- * @returns true si existía y se actualizó, false si no existe.
+ * @param usuarioId Id del usuario que hace la petición.
+ * @returns true si existía, era suya y se actualizó; false en otro caso.
  */
-export async function markAsRead(id: number): Promise<boolean> {
+export async function markAsRead(id: number, usuarioId: number): Promise<boolean> {
   const [result] = await pool.execute<ResultSetHeader>(
-    'UPDATE notificacion SET leida = TRUE WHERE id = ?',
-    [id]
+    'UPDATE notificacion SET leida = TRUE WHERE id = ? AND usuario_id = ?',
+    [id, usuarioId]
   );
   return result.affectedRows > 0;
 }

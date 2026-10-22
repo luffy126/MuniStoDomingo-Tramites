@@ -39,9 +39,6 @@ export const validateRegister = [
     .matches(/\d/).withMessage('La contraseña debe contener al menos un número')
     .custom((value: string) => Buffer.byteLength(value, 'utf8') <= 72)
     .withMessage('La contraseña no puede superar 72 bytes'),
-  body('rol').optional().isString()
-    .withMessage('El rol debe ser "vecino" o "funcionario"').bail()
-    .isIn(['vecino', 'funcionario']).withMessage('El rol debe ser "vecino" o "funcionario"'),
   handleValidationErrors,
 ];
 

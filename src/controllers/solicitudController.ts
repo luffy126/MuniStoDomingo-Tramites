@@ -38,10 +38,9 @@ export const crearSolicitud = async (
       return;
     }
 
-    const folio = await solicitudService.generarFolio();
     const vecinoId = req.user!.id;
 
-    const nueva = await solicitudService.create(folio, tramiteId, vecinoId, observaciones);
+    const nueva = await solicitudService.create(tramiteId, vecinoId, observaciones);
     res.status(201).json({ success: true, data: nueva });
   } catch (err) {
     next(err);
@@ -86,7 +85,8 @@ export const listarSolicitudes = async (
 /**
  * GET /api/solicitudes/:id
  * Detalle de una solicitud. El id es el folio (ej. SOL-1001), que es como el
- * frontend identifica las solicitudes. 404 si no existe.
+ * frontend identifica las solicitudes. 404 si no existe o si un vecino pide
+ * una que no es suya.
  */
 export const obtenerSolicitud = async (
   req: Request,
@@ -95,6 +95,15 @@ export const obtenerSolicitud = async (
 ): Promise<void> => {
   try {
     const folio = String(req.params.id);
+    const user = req.user!;
+
+    // Un vecino solo ve las suyas. Se responde 404 (no 403) para no revelar
+    // que el folio existe.
+    if (user.rol === 'vecino' && (await solicitudService.getOwnerId(folio)) !== user.id) {
+      res.status(404).json({ success: false, error: 'Solicitud no encontrada' });
+      return;
+    }
+
     const solicitud = await solicitudService.getById(folio);
 
     if (!solicitud) {

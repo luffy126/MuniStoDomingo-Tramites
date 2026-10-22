@@ -1,4 +1,4 @@
-import type { Rol } from '../services/userService';
+import type { Rol } from './index';
 
 declare global {
   namespace Express {

@@ -37,7 +37,7 @@ export const marcarLeida = async (
     }
     const id = Number(param);
 
-    const resultado = await notificacionService.markAsRead(id);
+    const resultado = await notificacionService.markAsRead(id, req.user!.id);
 
     if (!resultado) {
       res.status(404).json({ success: false, error: 'Notificación no encontrada' });

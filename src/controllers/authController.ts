@@ -1,28 +1,31 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createUser, findByEmail, findById } from '../services/userService';
-import type { User } from '../services/userService';
+import type { UsuarioPublico } from '../types';
 import { jwtSecret, jwtOptions } from '../config/jwt';
 
-function publicUser(user: User): User {
+/** Copia solo los campos públicos; acepta también un UsuarioDB (con password_hash). */
+function publicUser(user: UsuarioPublico): UsuarioPublico {
   return { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol };
 }
 
-function session(user: User) {
+function session(user: UsuarioPublico) {
   const token = jwt.sign({ id: user.id, email: user.email, rol: user.rol }, jwtSecret, jwtOptions);
   return { user: publicUser(user), token };
 }
 
-export const register = async (req: Request, res: Response): Promise<void> => {
+export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { nombre, email, password, rol } = req.body;
+    // El registro público siempre crea vecinos: el rol del body se ignora para
+    // que nadie pueda autoasignarse permisos de funcionario.
+    const { nombre, email, password } = req.body;
     if (await findByEmail(email)) {
       res.status(409).json({ success: false, error: 'El email ya está registrado' });
       return;
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await createUser(nombre.trim(), email, passwordHash, rol || 'vecino');
+    const user = await createUser(nombre.trim(), email, passwordHash, 'vecino');
     res.status(201).json({ success: true, data: session(user) });
   } catch (error) {
     // La restricción UNIQUE también cubre registros concurrentes del mismo correo.
@@ -30,11 +33,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       res.status(409).json({ success: false, error: 'El email ya está registrado' });
       return;
     }
-    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    next(error);
   }
 };
 
-export const login = async (req: Request, res: Response): Promise<void> => {
+export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { email, password } = req.body;
     const user = await findByEmail(email);
@@ -43,12 +46,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     res.status(200).json({ success: true, data: session(user) });
-  } catch {
-    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  } catch (error) {
+    next(error);
   }
 };
 
-export const getMe = async (req: Request, res: Response): Promise<void> => {
+export const getMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, error: 'No autenticado' });
     return;
@@ -60,7 +63,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     res.status(200).json({ success: true, data: publicUser(user) });
-  } catch {
-    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  } catch (error) {
+    next(error);
   }
 };

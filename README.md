@@ -69,9 +69,29 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 | --- | --- |
 | `npm run dev` | Levanta el servidor con `ts-node` y lo reinicia con `nodemon` al guardar cambios en `src/` |
 | `npm run typecheck` | Revisa los tipos sin generar archivos. Debe pasar antes de abrir un PR |
-| `npm test` | Compila y ejecuta las pruebas de autenticación (`tests/`). No necesitan MySQL |
+| `npm test` | Compila y ejecuta las pruebas (`tests/`). **Necesitan MySQL/MariaDB en marcha**, ver [Pruebas](#pruebas) |
 | `npm run build` | Compila TypeScript a `dist/` |
 | `npm start` | Ejecuta la versión compilada (`dist/server.js`) |
+
+### Pruebas
+
+`tests/auth.test.cjs` prueba auth y roles con la persistencia simulada. `tests/api.test.cjs`
+prueba **toda la API contra una base real** (registro, solicitudes, folios simultáneos,
+permisos por dueño, notificaciones, reportes).
+
+La base de pruebas se llama `muni_stodomingo_test`: se **borra y recrea desde `schema.sql`**
+en cada ejecución, y nunca usa el `DB_NAME` del `.env`. Con XAMPP (MySQL encendido, `root` sin
+contraseña) basta con `npm test`. Para otra conexión:
+
+```bash
+TEST_DB_HOST=localhost TEST_DB_PORT=3306 TEST_DB_USER=root TEST_DB_PASSWORD= npm test
+# Sin XAMPP, con Docker:
+docker run -d --name muni-test-db -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 -p 127.0.0.1:3307:3306 mariadb:11.4
+TEST_DB_PORT=3307 npm test
+```
+
+El usuario de la base necesita permiso para `CREATE`/`DROP DATABASE`. `TEST_DB_NAME` debe
+terminar en `_test`.
 
 ### Variables de entorno
 
