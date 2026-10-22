@@ -146,11 +146,9 @@ Crea una cuenta y devuelve la sesión iniciada.
 | `nombre` | Sí | Entre 2 y 120 caracteres (se recortan los espacios) |
 | `email` | Sí | Formato válido. Se recorta y se guarda en minúsculas |
 | `password` | Sí | Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número; máximo 72 bytes |
-| `rol` | No | `vecino` (por defecto) o `funcionario` |
 
-> ⚠️ Hoy el registro público permite crear cuentas `funcionario`, porque así lo pide el
-> contrato de la evaluación. En un despliegue real esa asignación debería requerir
-> autorización.
+> El registro público siempre crea cuentas `vecino`: si el body incluye `rol`, se ignora.
+> Las cuentas `funcionario` se crean directamente en la base de datos (ver `schema.sql`).
 
 **201**
 
@@ -389,10 +387,7 @@ GET /api/solicitudes/SOL-1003
 }
 ```
 
-**404** `{ "success": false, "error": "Solicitud no encontrada" }`
-
-> ⚠️ Hoy no se verifica que la solicitud pertenezca al vecino que la consulta. Ver
-> [pendientes](CHECKLIST_AVANCES.md#problemas-conocidos).
+**404** `{ "success": false, "error": "Solicitud no encontrada" }` (también cuando un vecino pide una solicitud que no es suya)
 
 ### `PATCH /api/solicitudes/:folio`
 
@@ -489,10 +484,7 @@ PATCH /api/notificaciones/1
 | Código | `error` | Causa |
 | --- | --- | --- |
 | 400 | `ID inválido` | No es un entero positivo (p. ej. `abc` o `5abc`) |
-| 404 | `Notificación no encontrada` | No existe |
-
-> ⚠️ Hoy no se verifica que la notificación pertenezca al usuario. Ver
-> [pendientes](CHECKLIST_AVANCES.md#problemas-conocidos).
+| 404 | `Notificación no encontrada` | No existe o pertenece a otro usuario |
 
 ---
 

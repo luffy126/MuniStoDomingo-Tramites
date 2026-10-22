@@ -80,8 +80,7 @@ test('Autenticación y autorización a través de HTTP', async (t) => {
     for (const body of [
       { nombre: '', email: 'incorrecto', password: '123' },
       { ...credentials, nombre: {} }, { ...credentials, email: [] },
-      { ...credentials, password: {} }, { ...credentials, rol: 'admin' },
-      { ...credentials, rol: 123 }, { ...credentials, password: 'Aa1' + 'á'.repeat(36) },
+      { ...credentials, password: {} }, { ...credentials, password: 'Aa1' + 'á'.repeat(36) },
     ]) {
       const result = await request('/api/auth/register', body);
       assert.equal(result.status, 400);
@@ -127,9 +126,14 @@ test('Autenticación y autorización a través de HTTP', async (t) => {
   await t.test('Permisos: vecino 403, funcionario 200, sin autenticación 401', async () => {
     assert.equal((await request('/solo-funcionario', undefined, `Bearer ${token}`)).status, 403);
     assert.equal((await request('/sin-autenticacion')).status, 401);
-    const result = await request('/api/auth/register', { ...credentials, email: 'funcionario@test.com', rol: 'funcionario' });
-    assert.equal(result.status, 201);
-    const allowed = await request('/solo-funcionario', undefined, `Bearer ${result.body.data.token}`);
+    // El registro público ignora `rol`: nadie puede autoasignarse funcionario.
+    const intento = await request('/api/auth/register', { ...credentials, email: 'funcionario@test.com', rol: 'funcionario' });
+    assert.equal(intento.status, 201);
+    assert.equal(intento.body.data.user.rol, 'vecino');
+    assert.equal((await request('/solo-funcionario', undefined, `Bearer ${intento.body.data.token}`)).status, 403);
+    // Los funcionarios reales vienen de la base de datos; aquí se firma su token directamente.
+    const funcionario = jwt.sign({ id: 50, email: 'func@test.com', rol: 'funcionario' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const allowed = await request('/solo-funcionario', undefined, `Bearer ${funcionario}`);
     assert.equal(allowed.status, 200);
     assert.deepEqual(Object.keys(allowed.body.data).sort(), ['email', 'id', 'rol']);
   });
