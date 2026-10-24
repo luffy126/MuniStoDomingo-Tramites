@@ -106,6 +106,33 @@ TEST_DB_PORT=3307 npm test
 El usuario de la base necesita permiso para `CREATE`/`DROP DATABASE`. `TEST_DB_NAME` debe
 terminar en `_test`.
 
+#### Validación manual con Postman
+
+1. Iniciar MySQL/MariaDB y el backend (`npm run dev`).
+2. En Postman, importar `postman_collection.json`.
+3. Ejecutar la colección **MuniStoDomingo API** con el Runner. La variable `baseUrl` debe apuntar a `http://localhost:3000`.
+4. Confirmar que todas las pruebas pasen. La ejecución validada obtuvo **52 pruebas aprobadas, 0 fallidas y 0 errores**.
+
+Las solicitudes de registro, creación o actualización modifican la base configurada en el backend. Para las pruebas, usar una instancia local.
+
+Evidencia de ejecución:
+
+![Resultado de Postman: vista resumida](docs/evidencia/EvidenciaValidaciónPostmanGrid.png)
+
+![Resultado de Postman: vista detallada, imagen 1 de 7](docs/evidencia/EvidenciaValidaciónPostmanList1.png)
+
+![Resultado de Postman: vista detallada, imagen 2 de 7](docs/evidencia/EvidenciaValidaciónPostmanList2.png)
+
+![Resultado de Postman: vista detallada, imagen 3 de 7](docs/evidencia/EvidenciaValidaciónPostmanList3.png)
+
+![Resultado de Postman: vista detallada, imagen 4 de 7](docs/evidencia/EvidenciaValidaciónPostmanList4.png)
+
+![Resultado de Postman: vista detallada, imagen 5 de 7](docs/evidencia/EvidenciaValidaciónPostmanList5.png)
+
+![Resultado de Postman: vista detallada, imagen 6 de 7](docs/evidencia/EvidenciaValidaciónPostmanList6.png)
+
+![Resultado de Postman: vista detallada, imagen 7 de 7](docs/evidencia/EvidenciaValidaciónPostmanList7.png)
+
 ### Variables de entorno
 
 | Variable | Para qué | Valor de desarrollo |
