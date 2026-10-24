@@ -12,9 +12,22 @@ está en la rama `frontend`.
 | [docs/API.md](docs/API.md) | Frontend, backend, evaluación | Referencia de cada endpoint con ejemplos de petición y respuesta |
 | [docs/CHECKLIST_AVANCES.md](docs/CHECKLIST_AVANCES.md) | Cada integrante | Qué está listo, qué falta, qué le toca a cada rol y cómo integrarlo |
 
-## Stack
+## Integrantes
 
-Node.js 18+, TypeScript, Express 5 y MySQL 8 / MariaDB 10+ (driver `mysql2`).
+- Simón Ledezma — Base de datos y servicios
+- Tomás Monge — Servidor Express y endpoints REST
+- Francisco Espinoza — Autenticación JWT y seguridad
+- Melissa Rojas — Integración frontend y pruebas
+
+## Stack tecnológico
+
+- Node.js 18+ + Express.js 5 + TypeScript
+- MySQL 8 / MariaDB 10+ (driver `mysql2`)
+- JSON Web Tokens (jsonwebtoken)
+- bcrypt para hash de contraseñas
+- express-validator para validación de inputs
+- cors para Cross-Origin Resource Sharing
+- dotenv para variables de entorno
 
 ## Puesta en marcha
 
@@ -92,6 +105,33 @@ TEST_DB_PORT=3307 npm test
 
 El usuario de la base necesita permiso para `CREATE`/`DROP DATABASE`. `TEST_DB_NAME` debe
 terminar en `_test`.
+
+#### Validación manual con Postman
+
+1. Iniciar MySQL/MariaDB y el backend (`npm run dev`).
+2. En Postman, importar `postman_collection.json`.
+3. Ejecutar la colección **MuniStoDomingo API** con el Runner. La variable `baseUrl` debe apuntar a `http://localhost:3000`.
+4. Confirmar que todas las pruebas pasen. La ejecución validada obtuvo **52 pruebas aprobadas, 0 fallidas y 0 errores**.
+
+Las solicitudes de registro, creación o actualización modifican la base configurada en el backend. Para las pruebas, usar una instancia local.
+
+Evidencia de ejecución:
+
+![Resultado de Postman: vista resumida](docs/evidencia/EvidenciaValidaciónPostmanGrid.png)
+
+![Resultado de Postman: vista detallada, imagen 1 de 7](docs/evidencia/EvidenciaValidaciónPostmanList1.png)
+
+![Resultado de Postman: vista detallada, imagen 2 de 7](docs/evidencia/EvidenciaValidaciónPostmanList2.png)
+
+![Resultado de Postman: vista detallada, imagen 3 de 7](docs/evidencia/EvidenciaValidaciónPostmanList3.png)
+
+![Resultado de Postman: vista detallada, imagen 4 de 7](docs/evidencia/EvidenciaValidaciónPostmanList4.png)
+
+![Resultado de Postman: vista detallada, imagen 5 de 7](docs/evidencia/EvidenciaValidaciónPostmanList5.png)
+
+![Resultado de Postman: vista detallada, imagen 6 de 7](docs/evidencia/EvidenciaValidaciónPostmanList6.png)
+
+![Resultado de Postman: vista detallada, imagen 7 de 7](docs/evidencia/EvidenciaValidaciónPostmanList7.png)
 
 ### Variables de entorno
 
@@ -224,6 +264,32 @@ Todas las respuestas usan el mismo sobre:
 | `500` | Error interno (en desarrollo incluye el detalle, en producción no) |
 
 La lista completa de endpoints, con ejemplos, está en [docs/API.md](docs/API.md).
+
+## Endpoints de la API
+
+La referencia completa de parámetros, cuerpos, respuestas y errores está en
+[docs/API.md](docs/API.md).
+
+| Método | Ruta | Autenticación | Rol | Descripción |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/health` | No | — | Estado del servidor |
+| `POST` | `/api/auth/register` | No | — | Crear una cuenta de vecino |
+| `POST` | `/api/auth/login` | No | — | Iniciar sesión y obtener JWT |
+| `GET` | `/api/auth/me` | Sí | Ambos | Obtener el perfil de la sesión |
+| `GET` | `/api/tramites` | No | — | Listar trámites activos y requisitos |
+| `GET` | `/api/tramites/:id` | No | — | Obtener el detalle de un trámite |
+| `POST` | `/api/solicitudes` | Sí | Vecino | Crear una solicitud |
+| `GET` | `/api/solicitudes` | Sí | Ambos | Listar solicitudes visibles para el usuario |
+| `GET` | `/api/solicitudes?estado=:estado` | Sí | Ambos | Filtrar solicitudes por estado |
+| `GET` | `/api/solicitudes/:folio` | Sí | Ambos | Obtener el detalle de una solicitud |
+| `PATCH` | `/api/solicitudes/:folio` | Sí | Funcionario | Cambiar el estado de una solicitud |
+| `GET` | `/api/solicitudes/reportes` | Sí | Funcionario | Contar solicitudes por estado |
+| `GET` | `/api/notificaciones` | Sí | Ambos | Listar notificaciones propias |
+| `PATCH` | `/api/notificaciones/:id` | Sí | Ambos | Marcar una notificación propia como leída |
+
+Las rutas protegidas requieren `Authorization: Bearer <token>`. El parámetro
+`:folio` usa valores como `SOL-1001`. El filtro `estado` acepta `pendiente`,
+`en_revision`, `aprobado` o `rechazado`.
 
 ## Base de datos
 
