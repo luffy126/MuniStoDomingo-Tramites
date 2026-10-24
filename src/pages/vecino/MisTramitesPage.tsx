@@ -9,7 +9,9 @@ import {
   IonList,
   IonNote,
   IonPage,
+  IonSpinner,
   IonText,
+  IonToast,
   IonTitle,
   IonToolbar,
   useIonViewWillEnter,
@@ -19,18 +21,25 @@ import { useAuth } from '../../context/AuthContext';
 import {
   COLOR_ESTADO,
   ETIQUETA_ESTADO,
+  getTramites,
   getSolicitudesPorVecino,
-  getTramiteById,
 } from '../../services/tramiteService';
-import type { Solicitud } from '../../services/tramiteService';
+import type { Solicitud, Tramite } from '../../services/tramiteService';
 
 const MisTramitesPage: React.FC = () => {
   const { user } = useAuth();
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
+  const [tramites, setTramites] = useState<Tramite[]>([]);
+  const [cargando, setCargando] = useState(false);
+  const [mensaje, setMensaje] = useState('');
 
   const cargar = useCallback((): void => {
-    setSolicitudes(getSolicitudesPorVecino(user?.nombre ?? ''));
-  }, [user]);
+    setCargando(true);
+    void Promise.all([getSolicitudesPorVecino(user?.nombre ?? ''), getTramites()])
+      .then(([items, catalogo]) => { setSolicitudes(items); setTramites(catalogo); })
+      .catch((error: unknown) => setMensaje(error instanceof Error ? error.message : 'No se pudieron cargar tus trámites.'))
+      .finally(() => setCargando(false));
+  }, [user?.nombre]);
 
   useIonViewWillEnter(cargar);
 
@@ -43,7 +52,7 @@ const MisTramitesPage: React.FC = () => {
       </IonHeader>
       <IonContent>
         <div className="contenedor-pagina">
-          {solicitudes.length === 0 ? (
+          {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando tus trámites…</p></div> : solicitudes.length === 0 ? (
             <div className="estado-vacio">
               <IonIcon icon={fileTrayOutline} color="medium" />
               <IonText color="medium">
@@ -55,7 +64,7 @@ const MisTramitesPage: React.FC = () => {
               {solicitudes.map((solicitud) => (
                 <IonItem key={solicitud.id} lines="full">
                   <IonLabel className="ion-text-wrap">
-                    <h2>{getTramiteById(solicitud.tramiteId)?.nombre ?? 'Trámite municipal'}</h2>
+                    <h2>{tramites.find((tramite) => tramite.id === solicitud.tramiteId)?.nombre ?? 'Trámite municipal'}</h2>
                     <p>
                       Folio {solicitud.id} · Ingresado el {solicitud.fecha}
                     </p>
@@ -71,6 +80,7 @@ const MisTramitesPage: React.FC = () => {
             </IonList>
           )}
         </div>
+        <IonToast isOpen={mensaje !== ''} message={mensaje} duration={3500} color="danger" onDidDismiss={() => setMensaje('')} />
       </IonContent>
     </IonPage>
   );
