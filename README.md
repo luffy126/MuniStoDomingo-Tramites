@@ -108,6 +108,26 @@ npx ionic capacitor run android
 npx ionic capacitor run ios
 ```
 
+## Conexión con el backend
+
+El frontend consume la API de la rama `backend`, que debe ejecutarse por separado con
+MySQL/MariaDB disponible y su esquema/datos semilla cargados. En el backend, configura
+`FRONTEND_URL=http://localhost:5173` para permitir el origen de Vite.
+
+Por defecto, la app usa `http://localhost:3000`. Para apuntar a otro servidor, crea un
+archivo `.env` en la raíz del frontend basándote en `.env.example` y define `VITE_API_URL`.
+La URL debe ser el origen del servidor, sin `/api` al final.
+
+En PowerShell puedes instalar e iniciar el frontend con:
+
+```powershell
+npm.cmd install
+npm.cmd run dev
+```
+
+La referencia de endpoints y ejemplos está en [`docs/API.md` de la rama `backend`](https://github.com/luffy126/MuniStoDomingo-Tramites/blob/backend/docs/API.md).
+La colección Postman está en la raíz de la rama `backend` (`postman_collection.json`).
+
 ## Diseño y prototipo
 - [Prototipo en Figma](#): https://www.figma.com/design/PDRMB1YzTolGblTi9Cxy10/MuniSitioDomingo?node-id=0-1&t=wjmz0PMK0jp7Rtdt-1
 
