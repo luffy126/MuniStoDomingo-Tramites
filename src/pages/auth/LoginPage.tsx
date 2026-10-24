@@ -25,13 +25,14 @@ const LoginPage: React.FC = () => {
 
   const manejarLogin = async (email: string, password: string): Promise<void> => {
     setCargando(true);
-    const exito = await login(email, password);
-    setCargando(false);
-    if (!exito) {
-      setMensaje('Correo o contraseña incorrectos.');
-      return;
+    try {
+      await login(email, password);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setMensaje(error instanceof Error ? error.message : 'No se pudo iniciar sesión.');
+    } finally {
+      setCargando(false);
     }
-    navigate('/', { replace: true });
   };
 
   return (
