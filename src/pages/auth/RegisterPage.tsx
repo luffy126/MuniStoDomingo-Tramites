@@ -26,13 +26,14 @@ const RegisterPage: React.FC = () => {
 
   const manejarRegistro = async (data: RegisterData): Promise<void> => {
     setCargando(true);
-    const exito = await register(data);
-    setCargando(false);
-    if (!exito) {
-      setMensaje('Ya existe una cuenta registrada con ese correo.');
-      return;
+    try {
+      await register(data);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setMensaje(error instanceof Error ? error.message : 'No se pudo crear la cuenta.');
+    } finally {
+      setCargando(false);
     }
-    navigate('/', { replace: true });
   };
 
   return (

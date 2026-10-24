@@ -1,3 +1,5 @@
+import apiClient, { SESSION_KEY, TOKEN_KEY } from './apiClient';
+
 export type Rol = 'vecino' | 'funcionario';
 
 export interface User {
@@ -14,67 +16,19 @@ export interface RegisterData {
   rol?: Rol;
 }
 
-interface StoredUser extends User {
-  password: string;
+interface BackendUser {
+  id: number | string;
+  nombre: string;
+  email: string;
+  rol: Rol;
 }
 
-const STORAGE_KEY = 'munisd.sesion';
-const LATENCIA_MS = 400;
+interface AuthResponse {
+  user: BackendUser;
+  token: string;
+}
 
-const usuarios: StoredUser[] = [
-  {
-    id: 'u-1',
-    nombre: 'Vecino Demo',
-    email: 'vecino@test.com',
-    password: 'Test1234',
-    rol: 'vecino',
-  },
-  {
-    id: 'u-2',
-    nombre: 'Funcionario Demo',
-    email: 'funcionario@test.com',
-    password: 'Test1234',
-    rol: 'funcionario',
-  },
-];
-
-const esperar = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-const sinPassword = (usuario: StoredUser): User => ({
-  id: usuario.id,
-  nombre: usuario.nombre,
-  email: usuario.email,
-  rol: usuario.rol,
-});
-
-export const loginRequest = async (email: string, password: string): Promise<User | null> => {
-  await esperar(LATENCIA_MS);
-  const encontrado = usuarios.find(
-    (usuario) => usuario.email.toLowerCase() === email.trim().toLowerCase() && usuario.password === password
-  );
-  return encontrado ? sinPassword(encontrado) : null;
-};
-
-export const registerRequest = async (datos: RegisterData): Promise<User | null> => {
-  await esperar(LATENCIA_MS);
-  const email = datos.email.trim().toLowerCase();
-  const yaExiste = usuarios.some((usuario) => usuario.email.toLowerCase() === email);
-  if (yaExiste) {
-    return null;
-  }
-  const nuevo: StoredUser = {
-    id: `u-${usuarios.length + 1}`,
-    nombre: datos.nombre.trim(),
-    email,
-    password: datos.password,
-    rol: datos.rol ?? 'vecino',
-  };
-  usuarios.push(nuevo);
-  return sinPassword(nuevo);
-};
-
-/** el almacenamiento puede no existir */
-const getAlmacenamiento = (): Storage | null => {
+const getStorage = (): Storage | null => {
   try {
     return window.localStorage ?? null;
   } catch {
@@ -82,21 +36,51 @@ const getAlmacenamiento = (): Storage | null => {
   }
 };
 
-export const guardarSesion = (user: User): void => {
-  getAlmacenamiento()?.setItem(STORAGE_KEY, JSON.stringify(user));
+const adaptarUser = (user: BackendUser): User => ({ ...user, id: String(user.id) });
+
+export const guardarSesion = (user: User, token: string): void => {
+  const storage = getStorage();
+  storage?.setItem(SESSION_KEY, JSON.stringify(user));
+  storage?.setItem(TOKEN_KEY, token);
 };
 
 export const limpiarSesion = (): void => {
-  getAlmacenamiento()?.removeItem(STORAGE_KEY);
+  const storage = getStorage();
+  storage?.removeItem(SESSION_KEY);
+  storage?.removeItem(TOKEN_KEY);
 };
 
-export const recuperarSesion = (): User | null => {
-  const guardado = getAlmacenamiento()?.getItem(STORAGE_KEY);
-  if (guardado === undefined || guardado === null) {
+export const loginRequest = async (email: string, password: string): Promise<User> => {
+  const response = await apiClient.post<AuthResponse>('/api/auth/login', { email, password });
+  const user = adaptarUser(response.user);
+  guardarSesion(user, response.token);
+  return user;
+};
+
+export const registerRequest = async (data: RegisterData): Promise<User> => {
+  const response = await apiClient.post<AuthResponse>('/api/auth/register', {
+    nombre: data.nombre.trim(),
+    email: data.email.trim().toLowerCase(),
+    password: data.password,
+  });
+  const user = adaptarUser(response.user);
+  guardarSesion(user, response.token);
+  return user;
+};
+
+export const recuperarSesion = async (): Promise<User | null> => {
+  const storage = getStorage();
+  const token = storage?.getItem(TOKEN_KEY);
+  if (!token) {
+    limpiarSesion();
     return null;
   }
+
   try {
-    return JSON.parse(guardado) as User;
+    const backendUser = await apiClient.get<BackendUser>('/api/auth/me');
+    const user = adaptarUser(backendUser);
+    storage?.setItem(SESSION_KEY, JSON.stringify(user));
+    return user;
   } catch {
     limpiarSesion();
     return null;
