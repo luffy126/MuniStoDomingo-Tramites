@@ -8,10 +8,31 @@ import {
   SolicitudFrontend,
   formatearFecha,
 } from '../types';
+import * as notificacionService from './notificacionService';
 
 /** Fila del SELECT base: la solicitud más el nombre del vecino que la ingresó. */
 interface FilaSolicitud extends RowDataPacket, SolicitudDB {
   vecino_nombre: string;
+}
+
+/** Fila bloqueada por `updateEstado`: lo necesario para validar la transición y avisar al vecino. */
+interface FilaActual extends RowDataPacket {
+  id: number;
+  vecino_id: number;
+  estado: EstadoSolicitud;
+  observaciones: string | null;
+  tramite_id: string;
+}
+
+/** Nombre de un trámite, para el texto del aviso. */
+interface FilaTramiteNombre extends RowDataPacket {
+  nombre: string;
+}
+
+/** Datos mínimos para decidir por qué no se pudo cancelar una solicitud. */
+interface FilaEstado extends RowDataPacket {
+  vecino_id: number;
+  estado: EstadoSolicitud;
 }
 
 /**
@@ -136,8 +157,42 @@ export async function getById(folio: string): Promise<SolicitudFrontend | null> 
   return toFrontend(rows[0]);
 }
 
+/** Estados a los que puede pasar una solicitud según su estado actual. */
+export const TRANSICIONES: Record<EstadoSolicitud, EstadoSolicitud[]> = {
+  pendiente: ['en_revision', 'aprobado', 'rechazado'],
+  // en_revision -> en_revision solo se acepta con observaciones nuevas (agregar información);
+  // sin ellas, o repitiendo las guardadas, no aportaría nada y llenaría la bandeja del vecino
+  // con avisos repetidos.
+  en_revision: ['en_revision', 'aprobado', 'rechazado'],
+  // aprobado y rechazado son estados finales.
+  aprobado: [],
+  rechazado: [],
+};
+
+/** Resultado de intentar cambiar el estado de una solicitud. */
+export type ResultadoCambioEstado =
+  | { tipo: 'actualizada'; solicitud: SolicitudFrontend }
+  | { tipo: 'no_encontrada' }
+  | { tipo: 'transicion_invalida'; estadoActual: EstadoSolicitud };
+
+/** Título y texto base del aviso que recibe el vecino según el nuevo estado. */
+const AVISO_POR_ESTADO: Record<Exclude<EstadoSolicitud, 'pendiente'>, { titulo: string; accion: string }> = {
+  en_revision: { titulo: 'Solicitud en revisión', accion: 'está en revisión' },
+  aprobado: { titulo: 'Solicitud aprobada', accion: 'fue aprobada' },
+  rechazado: { titulo: 'Solicitud rechazada', accion: 'fue rechazada' },
+};
+
 /**
- * Cambia el estado de una solicitud y registra qué funcionario la resolvió.
+ * Cambia el estado de una solicitud, registra qué funcionario la resolvió y
+ * avisa al vecino dueño.
+ *
+ * Todo ocurre en una transacción: la fila se lee con `FOR UPDATE` (dos
+ * funcionarios simultáneos no pueden resolver la misma solicitud dos veces), se
+ * valida la transición contra el estado actual (ver `TRANSICIONES`; pasar al
+ * mismo estado exige observaciones nuevas), se actualiza y se crea UNA notificación para
+ * el vecino. El bloqueo es solo sobre la fila de `solicitud`: el nombre del
+ * trámite se lee aparte, sin bloqueo. Si algo falla, no queda un cambio
+ * de estado sin su aviso.
  *
  * `resuelta_en` solo se completa cuando el trámite llega a un estado final
  * (aprobado o rechazado). Si no se envían observaciones, se conservan las que
@@ -147,27 +202,74 @@ export async function getById(folio: string): Promise<SolicitudFrontend | null> 
  * @param estado Nuevo estado.
  * @param funcionarioId Id del funcionario que resuelve.
  * @param observaciones Comentario opcional dirigido al vecino.
- * @returns La solicitud actualizada o null si el folio no existe.
+ * @returns La solicitud actualizada, o el motivo por el que no se pudo cambiar.
  */
 export async function updateEstado(
   folio: string,
   estado: EstadoSolicitud,
   funcionarioId: number,
   observaciones?: string
-): Promise<SolicitudFrontend | null> {
-  const resueltaEn = estado === 'aprobado' || estado === 'rechazado' ? new Date() : null;
+): Promise<ResultadoCambioEstado> {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  const [result] = await pool.execute<ResultSetHeader>(
-    `UPDATE solicitud
-     SET estado = ?, funcionario_id = ?, observaciones = COALESCE(?, observaciones), resuelta_en = ?
-     WHERE folio = ?`,
-    [estado, funcionarioId, observaciones ?? null, resueltaEn, folio]
-  );
+    const [actuales] = await conn.execute<FilaActual[]>(
+      'SELECT id, vecino_id, estado, observaciones, tramite_id FROM solicitud WHERE folio = ? FOR UPDATE',
+      [folio]
+    );
 
-  if (result.affectedRows === 0) {
-    return null;
+    if (actuales.length === 0) {
+      await conn.rollback();
+      return { tipo: 'no_encontrada' };
+    }
+
+    const actual = actuales[0];
+    // Repetir el estado solo aporta si las observaciones traen algo distinto de lo ya guardado
+    // (la UI precarga las actuales: reenviarlas iguales no es información nueva).
+    const nuevas = observaciones?.trim() ?? '';
+    const sinInformacionNueva =
+      actual.estado === estado && (nuevas === '' || nuevas === (actual.observaciones ?? '').trim());
+    if (!TRANSICIONES[actual.estado].includes(estado) || sinInformacionNueva) {
+      await conn.rollback();
+      return { tipo: 'transicion_invalida', estadoActual: actual.estado };
+    }
+
+    // Sin FOR UPDATE: solo se necesita el nombre para el texto del aviso.
+    const [tramites] = await conn.execute<FilaTramiteNombre[]>(
+      'SELECT nombre FROM tramite WHERE id = ?',
+      [actual.tramite_id]
+    );
+
+    const resueltaEn = estado === 'aprobado' || estado === 'rechazado' ? new Date() : null;
+    await conn.execute(
+      `UPDATE solicitud
+       SET estado = ?, funcionario_id = ?, observaciones = COALESCE(?, observaciones), resuelta_en = ?
+       WHERE id = ?`,
+      [estado, funcionarioId, observaciones ?? null, resueltaEn, actual.id]
+    );
+
+    // 'pendiente' no es un destino válido (ver TRANSICIONES), así que siempre hay aviso.
+    const aviso = AVISO_POR_ESTADO[estado as Exclude<EstadoSolicitud, 'pendiente'>];
+    const comentario = observaciones?.trim() ? ` Observaciones: ${observaciones.trim()}` : '';
+    await notificacionService.create(
+      actual.vecino_id,
+      actual.id,
+      aviso.titulo,
+      `Tu solicitud ${folio} (${tramites[0].nombre}) ${aviso.accion}.${comentario}`,
+      conn
+    );
+
+    const [rows] = await conn.execute<FilaSolicitud[]>(`${BASE_SELECT} WHERE s.id = ?`, [actual.id]);
+    await conn.commit();
+    return { tipo: 'actualizada', solicitud: toFrontend(rows[0]) };
+  } catch (err) {
+    // Si el rollback también falla (conexión caída) se conserva el error original.
+    await conn.rollback().catch(() => undefined);
+    throw err;
+  } finally {
+    conn.release();
   }
-  return getById(folio);
 }
 
 /**
@@ -219,4 +321,37 @@ export async function getOwnerId(folio: string): Promise<number | null> {
     [folio]
   );
   return rows.length === 0 ? null : rows[0].vecino_id;
+}
+
+/** Resultado de intentar cancelar una solicitud. */
+export type ResultadoCancelacion = 'cancelada' | 'no_encontrada' | 'no_pendiente';
+
+/**
+ * Elimina una solicitud pendiente de un vecino (cancelación).
+ *
+ * El DELETE exige las tres condiciones a la vez (folio, dueño y estado
+ * pendiente), así que es atómico frente a un cambio de estado concurrente del
+ * funcionario. Si no borra nada, se consulta el motivo para que el controlador
+ * responda 404 (no existe o es de otro vecino) o 409 (ya no está pendiente).
+ * Los avisos de la solicitud se conservan: `notificacion.solicitud_id` es
+ * ON DELETE SET NULL.
+ *
+ * @param folio Folio de la solicitud.
+ * @param vecinoId Id del vecino que pide la cancelación.
+ */
+export async function cancelar(folio: string, vecinoId: number): Promise<ResultadoCancelacion> {
+  const [result] = await pool.execute<ResultSetHeader>(
+    "DELETE FROM solicitud WHERE folio = ? AND vecino_id = ? AND estado = 'pendiente'",
+    [folio, vecinoId]
+  );
+  if (result.affectedRows > 0) {
+    return 'cancelada';
+  }
+
+  const [rows] = await pool.execute<FilaEstado[]>(
+    'SELECT vecino_id, estado FROM solicitud WHERE folio = ?',
+    [folio]
+  );
+  // Misma respuesta para "no existe" y "es de otro vecino": no se revela el folio.
+  return rows.length === 0 || rows[0].vecino_id !== vecinoId ? 'no_encontrada' : 'no_pendiente';
 }

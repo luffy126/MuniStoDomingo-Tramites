@@ -32,6 +32,24 @@ export async function createUser(
 }
 
 /**
+ * Reemplaza el nombre y el correo de un usuario (el rol y la contraseña no cambian).
+ *
+ * @param id Id numérico del usuario.
+ * @param nombre Nuevo nombre completo.
+ * @param email Nuevo correo electrónico, único en la tabla.
+ * @returns El usuario actualizado sin contraseña, o null si el id no existe.
+ * @throws Error de MySQL con código ER_DUP_ENTRY si otro usuario ya tiene ese email.
+ */
+export async function updateUser(
+  id: number,
+  nombre: string,
+  email: string
+): Promise<UsuarioPublico | null> {
+  await pool.execute('UPDATE usuario SET nombre = ?, email = ? WHERE id = ?', [nombre, email, id]);
+  return findById(id);
+}
+
+/**
  * Busca un usuario por correo, sin distinguir mayúsculas.
  *
  * Devuelve la fila completa, incluido `password_hash`, porque el login necesita

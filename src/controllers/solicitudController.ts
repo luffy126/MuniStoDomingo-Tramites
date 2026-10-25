@@ -121,6 +121,8 @@ export const obtenerSolicitud = async (
  * PATCH /api/solicitudes/:id
  * Cambia el estado de una solicitud (solo funcionarios). El id es el folio.
  * Body: { estado: EstadoSolicitud, observaciones?: string }
+ * Valida la transición (409 si no es válida; pasar al mismo estado exige
+ * observaciones) y crea un aviso para el vecino.
  */
 export const actualizarEstado = async (
   req: Request,
@@ -145,19 +147,28 @@ export const actualizarEstado = async (
     }
 
     const funcionarioId = req.user!.id;
-    const actualizada = await solicitudService.updateEstado(
+    // Se recorta antes de guardar; un texto en blanco equivale a no enviar observaciones.
+    const resultado = await solicitudService.updateEstado(
       folio,
       estado,
       funcionarioId,
-      observaciones
+      observaciones?.trim() || undefined
     );
 
-    if (!actualizada) {
+    if (resultado.tipo === 'no_encontrada') {
       res.status(404).json({ success: false, error: 'Solicitud no encontrada' });
       return;
     }
 
-    res.status(200).json({ success: true, data: actualizada });
+    if (resultado.tipo === 'transicion_invalida') {
+      res.status(409).json({
+        success: false,
+        error: `No se puede pasar una solicitud de "${resultado.estadoActual}" a "${estado}"`,
+      });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: resultado.solicitud });
   } catch (err) {
     next(err);
   }
@@ -175,6 +186,37 @@ export const obtenerReportes = async (
   try {
     const resumen = await solicitudService.getResumenPorEstado();
     res.status(200).json({ success: true, data: resumen });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * DELETE /api/solicitudes/:id
+ * El vecino dueño cancela una solicitud que sigue pendiente (solo vecinos).
+ * El id es el folio. 204 sin cuerpo; 404 si no existe o es de otro vecino;
+ * 409 si ya no está pendiente.
+ */
+export const cancelarSolicitud = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const folio = String(req.params.id);
+    const resultado = await solicitudService.cancelar(folio, req.user!.id);
+
+    if (resultado === 'no_encontrada') {
+      res.status(404).json({ success: false, error: 'Solicitud no encontrada' });
+      return;
+    }
+
+    if (resultado === 'no_pendiente') {
+      res.status(409).json({ success: false, error: 'Solo se pueden cancelar solicitudes pendientes' });
+      return;
+    }
+
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

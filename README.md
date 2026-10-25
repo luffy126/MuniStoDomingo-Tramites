@@ -48,19 +48,14 @@ tiene contraseña. También se puede importar `schema.sql` desde phpMyAdmin
 (http://localhost/phpmyadmin → *Importar*).
 
 `schema.sql` crea las cinco tablas y carga datos semilla, de modo que el sistema queda
-utilizable apenas se levanta. **No se puede ejecutar dos veces**: para volver a la semilla
-primero hay que borrar la base.
-
-```bash
-mysql -u root -p -e "DROP DATABASE muni_stodomingo"
-mysql -u root -p --default-character-set=utf8mb4 < schema.sql
-```
+utilizable apenas se levanta. Se puede volver a ejecutar para reiniciar los datos a la
+semilla (borra y recrea las tablas con `DROP TABLE IF EXISTS`; la base no se elimina).
 
 ### 2. Backend
 
 ```bash
 npm install
-cp .env.example .env     # completar DB_PASSWORD y JWT_SECRET
+cp .env.example .env     # completar DB_PASSWORD y JWT_SECRET (FRONTEND_URL ya apunta a Vite, :5173)
 npm run dev
 ```
 
@@ -106,14 +101,25 @@ TEST_DB_PORT=3307 npm test
 El usuario de la base necesita permiso para `CREATE`/`DROP DATABASE`. `TEST_DB_NAME` debe
 terminar en `_test`.
 
+No ejecutes dos `npm test` a la vez: comparten la base `muni_stodomingo_test` y se la borran
+entre sí. La suite fija `NODE_ENV=test`, así que no depende del `.env` de quien la ejecuta.
+
 #### Validación manual con Postman
 
 1. Iniciar MySQL/MariaDB y el backend (`npm run dev`).
 2. En Postman, importar `postman_collection.json`.
 3. Ejecutar la colección **MuniStoDomingo API** con el Runner. La variable `baseUrl` debe apuntar a `http://localhost:3000`.
-4. Confirmar que todas las pruebas pasen. La ejecución validada obtuvo **52 pruebas aprobadas, 0 fallidas y 0 errores**.
+4. Confirmar que todas las pruebas pasen. La colección tiene **36 peticiones y 80 aserciones**; la última ejecución con newman (dos corridas seguidas, sin reiniciar la base) obtuvo **0 fallos**.
 
-Las solicitudes de registro, creación o actualización modifican la base configurada en el backend. Para las pruebas, usar una instancia local.
+Alternativa por consola, con el servidor corriendo (no se agrega como dependencia del proyecto):
+
+```bash
+npx --yes newman@6.2.1 run postman_collection.json
+```
+
+La colección cubre éxito y error de cada endpoint (200, 201, 204, 400, 401, 403, 404 y 409). Las solicitudes de registro, creación, actualización o cancelación modifican la base configurada en el backend. Para las pruebas, usar una instancia local.
+
+> Las capturas de abajo corresponden a la versión anterior de la colección; actualízalas tras ejecutar el Runner con la colección nueva.
 
 Evidencia de ejecución:
 
@@ -143,7 +149,7 @@ Evidencia de ejecución:
 | `JWT_SECRET` | Firma de los tokens de sesión | String aleatorio de 32+ caracteres |
 | `JWT_EXPIRES_IN` | Vigencia de los tokens | `24h` |
 | `PORT` | Puerto del servidor | `3000` |
-| `NODE_ENV` | En `development` los errores 500 muestran el detalle | `development` |
+| `NODE_ENV` | En `development` el detalle y el stack de los errores 500 solo se escriben en la consola del servidor; nunca se envían al cliente | `development` |
 | `FRONTEND_URL` | Origen permitido por CORS | `http://localhost:5173` si el front corre con Vite (`npm run dev`), `http://localhost:8100` con `ionic serve` |
 
 El archivo `.env` nunca se sube al repositorio; `.env.example` documenta las claves.
@@ -169,8 +175,9 @@ MySQL / MariaDB
 ```
 
 Los errores no esperados de cualquier capa llegan a `middleware/errorHandler.ts`, que
-responde con el formato estándar: 400 si el body no es JSON válido, 413 si supera 16kb y
-500 en cualquier otro caso.
+responde con el formato estándar: 400 si el body no es JSON válido, 413 si supera 16kb, 415
+si la codificación del body no está soportada y 500 genérico en cualquier otro caso. Nunca
+devuelve `err.message` al cliente.
 
 ### Estructura
 
@@ -205,7 +212,8 @@ src/
     ├── solicitudService.ts
     └── notificacionService.ts
 tests/
-└── auth.test.cjs                  Pruebas HTTP de autenticación y roles           (Francisco)
+├── auth.test.cjs                  Pruebas HTTP de autenticación y roles           (Francisco)
+└── api.test.cjs                   API completa contra la base de pruebas real
 ```
 
 ### Autenticación y roles
@@ -237,8 +245,7 @@ El detalle de los endpoints de auth (validaciones, mensajes de error) está en
   datos suba para que lo maneje el middleware de errores. Todas las consultas son
   parametrizadas con `?`, nunca por concatenación de texto.
 - **Controladores**: validan lo que llega del cliente, llaman a los servicios y responden.
-  Los errores inesperados de la API de negocio se pasan a `next(err)`; los de autenticación
-  responden directamente un 500 genérico. No escriben SQL.
+  Todos pasan los errores inesperados a `next(err)`. No escriben SQL.
 - **Rutas**: solo declaran URL, método, middlewares y controlador. Las rutas fijas (como
   `/reportes`) van antes de las que tienen parámetros (`/:id`).
 
@@ -255,20 +262,23 @@ Todas las respuestas usan el mismo sobre:
 | --- | --- |
 | `200` | Consulta o actualización exitosa |
 | `201` | Recurso creado |
+| `204` | Operación exitosa sin cuerpo (cancelar una solicitud) |
 | `400` | Datos de entrada inválidos o faltantes, o JSON mal formado. Las validaciones de auth agregan `details: [{ campo, mensaje }]` |
 | `401` | No autenticado: falta el token, es inválido o expiró; o credenciales incorrectas en el login |
 | `403` | Autenticado pero con un rol que no tiene permiso |
 | `404` | Recurso o ruta inexistente |
-| `409` | El email ya está registrado |
+| `409` | Conflicto: email ya registrado o estado de la solicitud no permite la operación |
 | `413` | El body supera 16kb |
-| `500` | Error interno (en desarrollo incluye el detalle, en producción no) |
+| `415` | Codificación del body no soportada (p. ej. `charset=latin1`) |
+| `500` | Error interno. Siempre `Error interno del servidor`; el detalle solo se registra en la consola |
 
 La lista completa de endpoints, con ejemplos, está en [docs/API.md](docs/API.md).
 
 ## Endpoints de la API
 
 La referencia completa de parámetros, cuerpos, respuestas y errores está en
-[docs/API.md](docs/API.md).
+[docs/API.md](docs/API.md). La tabla lista 16 entradas (15 rutas distintas más el filtro
+`?estado=`).
 
 | Método | Ruta | Autenticación | Rol | Descripción |
 | --- | --- | --- | --- | --- |
@@ -276,22 +286,100 @@ La referencia completa de parámetros, cuerpos, respuestas y errores está en
 | `POST` | `/api/auth/register` | No | — | Crear una cuenta de vecino |
 | `POST` | `/api/auth/login` | No | — | Iniciar sesión y obtener JWT |
 | `GET` | `/api/auth/me` | Sí | Ambos | Obtener el perfil de la sesión |
+| `PUT` | `/api/auth/me` | Sí | Ambos | Editar nombre y email (devuelve un token nuevo) |
 | `GET` | `/api/tramites` | No | — | Listar trámites activos y requisitos |
-| `GET` | `/api/tramites/:id` | No | — | Obtener el detalle de un trámite |
+| `GET` | `/api/tramites/:id` | No | — | Obtener el detalle de un trámite activo |
 | `POST` | `/api/solicitudes` | Sí | Vecino | Crear una solicitud |
 | `GET` | `/api/solicitudes` | Sí | Ambos | Listar solicitudes visibles para el usuario |
 | `GET` | `/api/solicitudes?estado=:estado` | Sí | Ambos | Filtrar solicitudes por estado |
 | `GET` | `/api/solicitudes/:folio` | Sí | Ambos | Obtener el detalle de una solicitud |
 | `PATCH` | `/api/solicitudes/:folio` | Sí | Funcionario | Cambiar el estado de una solicitud |
+| `DELETE` | `/api/solicitudes/:folio` | Sí | Vecino | Cancelar una solicitud propia que sigue pendiente |
 | `GET` | `/api/solicitudes/reportes` | Sí | Funcionario | Contar solicitudes por estado |
 | `GET` | `/api/notificaciones` | Sí | Ambos | Listar notificaciones propias |
-| `PATCH` | `/api/notificaciones/:id` | Sí | Ambos | Marcar una notificación propia como leída |
+| `PATCH` | `/api/notificaciones/:id` | Sí | Ambos | Marcar una notificación propia como leída (devuelve la notificación) |
+
+Cambiar el estado valida la transición (los estados `aprobado` y `rechazado` son finales, y
+repetir `en_revision` exige observaciones; una transición inválida responde 409) y crea una notificación para el vecino dueño, en la misma
+transacción.
 
 Las rutas protegidas requieren `Authorization: Bearer <token>`. El parámetro
 `:folio` usa valores como `SOL-1001`. El filtro `estado` acepta `pendiente`,
 `en_revision`, `aprobado` o `rechazado`.
 
 ## Base de datos
+
+```mermaid
+erDiagram
+    usuario ||--o{ solicitud : "ingresa (vecino_id)"
+    usuario |o--o{ solicitud : "resuelve (funcionario_id)"
+    tramite ||--o{ requisito : "exige"
+    tramite ||--o{ solicitud : "se solicita en"
+    usuario ||--o{ notificacion : "recibe"
+    solicitud |o--o{ notificacion : "origina"
+
+    usuario {
+        INT id PK
+        VARCHAR nombre
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR rol "vecino o funcionario"
+        TIMESTAMP creado_en
+    }
+    tramite {
+        VARCHAR id PK
+        VARCHAR nombre
+        VARCHAR categoria "certificados, permisos, reclamos, solicitudes"
+        TEXT descripcion
+        VARCHAR icono
+        BOOLEAN activo
+    }
+    requisito {
+        INT id PK
+        VARCHAR tramite_id FK
+        VARCHAR descripcion
+        INT orden
+    }
+    solicitud {
+        INT id PK
+        VARCHAR folio UK
+        VARCHAR tramite_id FK
+        INT vecino_id FK
+        INT funcionario_id FK "NULL hasta que se gestiona"
+        VARCHAR estado "pendiente, en_revision, aprobado, rechazado"
+        TEXT observaciones
+        TIMESTAMP creada_en
+        TIMESTAMP resuelta_en
+    }
+    notificacion {
+        INT id PK
+        INT usuario_id FK
+        INT solicitud_id FK "NULL si es un aviso general"
+        VARCHAR titulo
+        TEXT mensaje
+        BOOLEAN leida
+        TIMESTAMP creada_en
+    }
+```
+
+### Integridad referencial
+
+| FK | Al borrar el padre | Por qué |
+| --- | --- | --- |
+| `requisito.tramite_id` | CASCADE | Los requisitos no tienen sentido sin su trámite |
+| `solicitud.tramite_id` | RESTRICT | No se puede borrar un trámite con solicitudes; por eso se desactivan (`activo`) y no se borran |
+| `solicitud.vecino_id` | RESTRICT | No se pierde el historial de un vecino con solicitudes |
+| `solicitud.funcionario_id` | RESTRICT | No se pierde la trazabilidad de quién resolvió |
+| `notificacion.usuario_id` | CASCADE | Los avisos pertenecen a su destinatario |
+| `notificacion.solicitud_id` | SET NULL | Cancelar una solicitud conserva sus avisos |
+
+Además, la base impone con `CHECK` los valores permitidos de `rol`, `categoria` y `estado`,
+con `UNIQUE` el `email` del usuario y el `folio` de la solicitud, y tiene tres índices
+(`idx_solicitud_estado`, `idx_solicitud_vecino`, `idx_notificacion_usuario`) para las
+consultas más frecuentes. Estas reglas se prueban en `tests/api.test.cjs`
+("Integridad de la base de datos").
+
+### Tablas
 
 | Tabla | Para qué |
 | --- | --- |
@@ -307,7 +395,7 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. El parámetro
 | --- | --- |
 | `usuario` | 2 cuentas de prueba (abajo) |
 | `tramite` / `requisito` | 6 trámites con 15 requisitos en total |
-| `solicitud` | 5 solicitudes del vecino demo, `SOL-1001` a `SOL-1005`, una o más en cada estado |
+| `solicitud` | 5 solicitudes del vecino demo, `SOL-1001` a `SOL-1005`, una o más en cada estado. Las resueltas (`aprobado`, `rechazado`) traen su fecha de resolución |
 | `notificacion` | 3 notificaciones del vecino demo, una ya leída |
 
 ### Cuentas de prueba

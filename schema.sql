@@ -1,10 +1,14 @@
 -- MuniStoDomingo-Tramites — estructura de la base de datos
 -- Propuesta inicial derivada del modelo de datos del frontend.
 -- Probado con MySQL 8 / MariaDB 10.
+-- Se puede ejecutar varias veces: reinicia los datos a la semilla (borra y recrea las tablas).
 
 CREATE DATABASE IF NOT EXISTS muni_stodomingo
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE muni_stodomingo;
+
+-- Permite volver a ejecutar el script: borra las tablas (hijas primero) y las recrea con la semilla.
+DROP TABLE IF EXISTS notificacion, solicitud, requisito, tramite, usuario;
 
 CREATE TABLE usuario (
   id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -107,12 +111,13 @@ INSERT INTO requisito (tramite_id, descripcion, orden) VALUES
   ('solicitud-retiro-escombros', 'Descripción del volumen aproximado', 2);
 
 -- Solicitudes de ejemplo (vecino_id = 1 es 'Vecino Demo', funcionario_id = 2 es 'Funcionario Demo')
-INSERT INTO solicitud (folio, tramite_id, vecino_id, funcionario_id, estado, observaciones, creada_en) VALUES
-  ('SOL-1001', 'cert-residencia', 1, NULL, 'pendiente', NULL, '2026-09-12 10:00:00'),
-  ('SOL-1002', 'permiso-obra-menor', 1, NULL, 'en_revision', 'Faltan planos firmados por el arquitecto.', '2026-09-14 14:30:00'),
-  ('SOL-1003', 'reclamo-alumbrado', 1, 2, 'aprobado', 'Cuadrilla asignada para el 20 de septiembre.', '2026-09-16 09:15:00'),
-  ('SOL-1004', 'permiso-evento', 1, 2, 'rechazado', 'El plan de seguridad no cumple con el aforo declarado.', '2026-09-18 11:00:00'),
-  ('SOL-1005', 'solicitud-retiro-escombros', 1, NULL, 'pendiente', NULL, '2026-09-20 16:45:00');
+-- resuelta_en solo se completa en las solicitudes en estado final (aprobado o rechazado).
+INSERT INTO solicitud (folio, tramite_id, vecino_id, funcionario_id, estado, observaciones, creada_en, resuelta_en) VALUES
+  ('SOL-1001', 'cert-residencia', 1, NULL, 'pendiente', NULL, '2026-09-12 10:00:00', NULL),
+  ('SOL-1002', 'permiso-obra-menor', 1, 2, 'en_revision', 'Faltan planos firmados por el arquitecto.', '2026-09-14 14:30:00', NULL),
+  ('SOL-1003', 'reclamo-alumbrado', 1, 2, 'aprobado', 'Cuadrilla asignada para el 20 de septiembre.', '2026-09-16 09:15:00', '2026-09-16 09:20:00'),
+  ('SOL-1004', 'permiso-evento', 1, 2, 'rechazado', 'El plan de seguridad no cumple con el aforo declarado.', '2026-09-18 11:00:00', '2026-09-19 10:30:00'),
+  ('SOL-1005', 'solicitud-retiro-escombros', 1, NULL, 'pendiente', NULL, '2026-09-20 16:45:00', NULL);
 
 -- Notificaciones de ejemplo (usuario_id = 1 es 'Vecino Demo')
 INSERT INTO notificacion (usuario_id, solicitud_id, titulo, mensaje, leida, creada_en) VALUES

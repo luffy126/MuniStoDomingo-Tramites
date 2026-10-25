@@ -36,13 +36,15 @@ El frontend puede revisar siempre `success` primero; `data` solo existe cuando e
 | --- | --- |
 | `200` | Consulta o actualización exitosa |
 | `201` | Usuario o solicitud creados |
+| `204` | Solicitud cancelada (sin cuerpo en la respuesta) |
 | `400` | Falta un campo, tiene un valor no permitido o el body no es JSON válido (`Datos de entrada inválidos`) |
 | `401` | No autenticado: falta el token, es inválido o expiró; o credenciales incorrectas en el login |
 | `403` | Autenticado, pero el rol no tiene permiso para ese endpoint (`No tienes permisos para esta acción`) |
 | `404` | El recurso no existe, o la ruta no existe |
-| `409` | El email ya está registrado |
+| `409` | Conflicto: el email ya está registrado, o la solicitud no está en un estado que admita la operación |
 | `413` | El body supera 16kb (`Solicitud demasiado grande`) |
-| `500` | Error interno. Con `NODE_ENV=development` el campo `error` trae el detalle (p. ej. `ECONNREFUSED` si la base de datos está apagada) |
+| `415` | Codificación del body no soportada, p. ej. `charset=latin1` (`Tipo de contenido no soportado`) |
+| `500` | Error interno. El campo `error` siempre es `Error interno del servidor`; el detalle (p. ej. `ECONNREFUSED` si la base de datos está apagada) solo se registra en la consola del servidor |
 
 Los errores de validación de los endpoints de autenticación agregan un campo `details`:
 
@@ -107,11 +109,13 @@ Siempre `YYYY-MM-DD`, en la zona horaria del servidor (no UTC). En Chile corresp
 | GET | `/api/solicitudes/reportes` | Sí | funcionario | Conteo de solicitudes por estado |
 | GET | `/api/solicitudes/:folio` | Sí | ambos | Detalle de una solicitud |
 | PATCH | `/api/solicitudes/:folio` | Sí | funcionario | Cambiar el estado |
+| DELETE | `/api/solicitudes/:folio` | Sí | vecino | Cancelar una solicitud propia que sigue pendiente |
 | GET | `/api/notificaciones` | Sí | ambos | Notificaciones del usuario |
 | PATCH | `/api/notificaciones/:id` | Sí | ambos | Marcar como leída |
 | POST | `/api/auth/register` | No | — | Crear cuenta y obtener token |
 | POST | `/api/auth/login` | No | — | Iniciar sesión y obtener token |
 | GET | `/api/auth/me` | Sí | ambos | Datos del usuario de la sesión |
+| PUT | `/api/auth/me` | Sí | ambos | Editar nombre y email; devuelve un token nuevo |
 
 ---
 
@@ -144,7 +148,7 @@ Crea una cuenta y devuelve la sesión iniciada.
 | Campo | Requerido | Regla |
 | --- | --- | --- |
 | `nombre` | Sí | Entre 2 y 120 caracteres (se recortan los espacios) |
-| `email` | Sí | Formato válido. Se recorta y se guarda en minúsculas |
+| `email` | Sí | Formato válido, hasta 160 caracteres. Se recorta y se guarda en minúsculas |
 | `password` | Sí | Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número; máximo 72 bytes |
 
 > El registro público siempre crea cuentas `vecino`: si el body incluye `rol`, se ignora.
@@ -212,6 +216,46 @@ Devuelve el usuario de la sesión. Sirve para restaurar la sesión al recargar l
 **Errores**: los 401 de [autenticación](#autenticación-en-las-peticiones), y **404** `Usuario no encontrado`
 si la cuenta se eliminó después de emitir el token.
 
+### `PUT /api/auth/me`
+
+Reemplaza el nombre y el email del usuario de la sesión (RF-06). Es el mismo recurso que
+`GET /api/auth/me`, por eso comparten URI. Sirve para ambos roles.
+
+**Body**
+
+```json
+{ "nombre": "Ana Pérez Soto", "email": "ana.nueva@correo.cl" }
+```
+
+| Campo | Requerido | Regla |
+| --- | --- | --- |
+| `nombre` | Sí | Entre 2 y 120 caracteres (se recortan los espacios) |
+| `email` | Sí | Formato válido, hasta 160 caracteres. Se recorta y se guarda en minúsculas |
+
+Con `PUT` se envían **los dos campos**. Si el body incluye `rol` o `password`, se ignoran.
+
+**200**: la sesión actualizada. Como el email viaja dentro del token, se **emite un token
+nuevo** y el cliente debe reemplazar el anterior.
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": { "id": 3, "nombre": "Ana Pérez Soto", "email": "ana.nueva@correo.cl", "rol": "vecino" },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**Errores**
+
+| Código | `error` | Causa |
+| --- | --- | --- |
+| 400 | `Datos de entrada inválidos` + `details` | Falta un campo o no cumple su regla |
+| 401 | `Token no proporcionado` / `Token inválido` / `Token expirado` | Falta el token o no es válido |
+| 404 | `Usuario no encontrado` | La cuenta se eliminó después de emitir el token |
+| 409 | `El email ya está registrado` | Otro usuario ya tiene ese correo |
+
 ---
 
 ## Trámites
@@ -264,7 +308,7 @@ Lista los trámites **activos**, ordenados por nombre, cada uno con sus requisit
 }
 ```
 
-**404** `{ "success": false, "error": "Trámite no encontrado" }`
+**404** `{ "success": false, "error": "Trámite no encontrado" }`, también cuando el trámite existe pero está inactivo.
 
 ---
 
@@ -395,6 +439,25 @@ Cambia el estado de una solicitud. **Solo funcionarios.** El servidor registra q
 funcionario hizo el cambio y, si el estado es `aprobado` o `rechazado`, la fecha de
 resolución.
 
+**Transiciones permitidas** (según el estado actual de la solicitud):
+
+| Estado actual | Puede pasar a |
+| --- | --- |
+| `pendiente` | `en_revision`, `aprobado`, `rechazado` |
+| `en_revision` | `en_revision` (**solo si se envían `observaciones`** no vacías, para agregar información), `aprobado`, `rechazado` |
+| `aprobado` | — (estado final) |
+| `rechazado` | — (estado final) |
+
+Ninguna transición vuelve a `pendiente`. Cualquier otra combinación responde **409**; también
+`en_revision` → `en_revision` sin observaciones (o con solo espacios) o con las mismas que ya
+tiene la solicitud, porque no aportaría información nueva. Las observaciones se guardan sin espacios sobrantes al inicio y al final.
+
+**Efecto**: cada cambio exitoso crea **una notificación** para el vecino dueño de la
+solicitud (`Solicitud en revisión`, `Solicitud aprobada` o `Solicitud rechazada`, con las
+observaciones si se enviaron). El cambio y el aviso se guardan en una misma transacción y la
+fila se bloquea mientras tanto: si dos funcionarios resuelven a la vez la misma solicitud, uno
+recibe 200 y el otro 409.
+
 **Body**
 
 ```json
@@ -404,7 +467,7 @@ resolución.
 | Campo | Requerido | Regla |
 | --- | --- | --- |
 | `estado` | Sí | Uno de los [valores permitidos](#valores-permitidos) |
-| `observaciones` | No | Texto. **Si se omite se conservan las observaciones anteriores** |
+| `observaciones` | No | Texto. **Si se omite se conservan las observaciones anteriores**; un texto vacío o en blanco equivale a omitirlas |
 
 **200**: la solicitud actualizada, con el mismo formato que el detalle.
 
@@ -416,6 +479,28 @@ resolución.
 | 400 | `observaciones debe ser texto` | No es string |
 | 403 | `No tienes permisos para esta acción` | El usuario es vecino |
 | 404 | `Solicitud no encontrada` | El folio no existe |
+| 409 | `No se puede pasar una solicitud de "<actual>" a "<nuevo>"` | La transición no está permitida (p. ej. una solicitud ya aprobada, o pasar a `en_revision` otra vez sin observaciones) |
+
+### `DELETE /api/solicitudes/:folio`
+
+El vecino cancela una solicitud **propia** mientras siga `pendiente`. **Solo vecinos.** Es un
+borrado físico: la solicitud desaparece, pero sus notificaciones se conservan (con
+`solicitud_id` en `NULL`). Un funcionario no cancela: para eso tiene el estado `rechazado`.
+
+```
+DELETE /api/solicitudes/SOL-1005
+```
+
+No lleva body. **204** sin cuerpo.
+
+**Errores**
+
+| Código | `error` | Causa |
+| --- | --- | --- |
+| 401 | `Token no proporcionado` / `Token inválido` / `Token expirado` | Falta el token o no es válido |
+| 403 | `No tienes permisos para esta acción` | El usuario es funcionario |
+| 404 | `Solicitud no encontrada` | El folio no existe **o** es de otro vecino (misma respuesta, para no revelar que existe) |
+| 409 | `Solo se pueden cancelar solicitudes pendientes` | La solicitud ya está `en_revision`, `aprobado` o `rechazado` |
 
 ---
 
@@ -437,6 +522,10 @@ siempre, en `0` si no hay ninguna.
 ## Notificaciones
 
 Todas requieren autenticación y trabajan sobre el usuario de la sesión.
+
+Los avisos los genera el servidor: cada vez que un funcionario cambia el estado de una
+solicitud (`PATCH /api/solicitudes/:folio`) el vecino dueño recibe una notificación. No hay un
+endpoint para crearlas.
 
 ### Objeto Notificación
 
@@ -477,7 +566,21 @@ Marca una notificación como leída. No requiere body.
 PATCH /api/notificaciones/1
 ```
 
-**200** `{ "success": true, "data": { "message": "Notificación marcada como leída" } }`
+**200**: la notificación actualizada, con el mismo formato que el listado. Es idempotente:
+marcar una notificación que ya estaba leída también responde 200.
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "1",
+    "titulo": "Solicitud aprobada",
+    "mensaje": "Tu reclamo por alumbrado público fue aprobado y asignado a una cuadrilla.",
+    "fecha": "2026-09-16",
+    "leida": true
+  }
+}
+```
 
 **Errores**
 
@@ -506,6 +609,7 @@ curl http://localhost:3000/api/solicitudes -H "Authorization: Bearer $TOKEN"
 curl -X POST http://localhost:3000/api/solicitudes -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" -d '{"tramiteId":"cert-residencia"}'
 curl -X PATCH http://localhost:3000/api/notificaciones/1 -H "Authorization: Bearer $TOKEN"
+curl -X DELETE http://localhost:3000/api/solicitudes/SOL-1005 -H "Authorization: Bearer $TOKEN"   # 204 si está pendiente
 ```
 
 Para probar como funcionario, repetir el login con `funcionario@test.com`.
