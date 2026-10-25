@@ -16,6 +16,11 @@ export interface RegisterData {
   rol?: Rol;
 }
 
+export interface PerfilData {
+  nombre: string;
+  email: string;
+}
+
 interface BackendUser {
   id: number | string;
   nombre: string;
@@ -63,6 +68,17 @@ export const registerRequest = async (data: RegisterData): Promise<User> => {
     email: data.email.trim().toLowerCase(),
     password: data.password,
   });
+  const user = adaptarUser(response.user);
+  guardarSesion(user, response.token);
+  return user;
+};
+
+export const actualizarPerfilRequest = async (data: PerfilData): Promise<User> => {
+  const response = await apiClient.put<AuthResponse>('/api/auth/me', {
+    nombre: data.nombre.trim(),
+    email: data.email.trim().toLowerCase(),
+  });
+  // El backend reemite el token porque el email viaja en sus claims.
   const user = adaptarUser(response.user);
   guardarSesion(user, response.token);
   return user;

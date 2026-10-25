@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   IonBadge,
+  IonButton,
   IonContent,
   IonHeader,
   IonIcon,
@@ -14,34 +15,66 @@ import {
   IonToast,
   IonTitle,
   IonToolbar,
-  useIonViewWillEnter,
+  useIonAlert,
 } from '@ionic/react';
 import { fileTrayOutline } from 'ionicons/icons';
-import { useAuth } from '../../context/AuthContext';
+import { useCargarAlEntrar } from '../../hooks/useCargarAlEntrar';
 import {
   COLOR_ESTADO,
   ETIQUETA_ESTADO,
+  cancelarSolicitud,
   getTramites,
-  getSolicitudesPorVecino,
+  getSolicitudes,
 } from '../../services/tramiteService';
 import type { Solicitud, Tramite } from '../../services/tramiteService';
 
 const MisTramitesPage: React.FC = () => {
-  const { user } = useAuth();
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [tramites, setTramites] = useState<Tramite[]>([]);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
+  const [tipoMensaje, setTipoMensaje] = useState<'success' | 'danger'>('danger');
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [presentarAlerta] = useIonAlert();
 
   const cargar = useCallback((): void => {
     setCargando(true);
-    void Promise.all([getSolicitudesPorVecino(user?.nombre ?? ''), getTramites()])
+    void Promise.all([getSolicitudes(), getTramites()])
       .then(([items, catalogo]) => { setSolicitudes(items); setTramites(catalogo); })
-      .catch((error: unknown) => setMensaje(error instanceof Error ? error.message : 'No se pudieron cargar tus trámites.'))
+      .catch((error: unknown) => { setTipoMensaje('danger'); setMensaje(error instanceof Error ? error.message : 'No se pudieron cargar tus trámites.'); })
       .finally(() => setCargando(false));
-  }, [user?.nombre]);
+  }, []);
 
-  useIonViewWillEnter(cargar);
+  useCargarAlEntrar('/vecino/mis-tramites', cargar);
+
+  const cancelar = async (folio: string): Promise<void> => {
+    setCancelando(folio);
+    try {
+      await cancelarSolicitud(folio);
+      setSolicitudes((actuales) => actuales.filter((solicitud) => solicitud.id !== folio));
+      setTipoMensaje('success');
+      setMensaje(`Solicitud ${folio} cancelada.`);
+    } catch (error) {
+      setTipoMensaje('danger');
+      setMensaje(error instanceof Error ? error.message : 'No se pudo cancelar la solicitud.');
+      // El estado pudo cambiar mientras tanto (409): se recarga la lista.
+      cargar();
+    } finally {
+      setCancelando(null);
+    }
+  };
+
+  const confirmarCancelacion = (folio: string): void => {
+    if (cancelando === folio) return;
+    void presentarAlerta({
+      header: 'Cancelar solicitud',
+      message: `¿Seguro que quieres cancelar la solicitud ${folio}? Esta acción no se puede deshacer.`,
+      buttons: [
+        { text: 'Volver', role: 'cancel' },
+        { text: 'Sí, cancelar', role: 'destructive', handler: () => { void cancelar(folio); } },
+      ],
+    });
+  };
 
   return (
     <IonPage>
@@ -71,6 +104,11 @@ const MisTramitesPage: React.FC = () => {
                     {solicitud.observaciones !== undefined ? (
                       <IonNote color="medium">{solicitud.observaciones}</IonNote>
                     ) : null}
+                    {solicitud.estado === 'pendiente' ? (
+                      <IonButton size="small" fill="outline" color="danger" className="ion-margin-top" disabled={cancelando === solicitud.id} onClick={() => confirmarCancelacion(solicitud.id)}>
+                        Cancelar solicitud
+                      </IonButton>
+                    ) : null}
                   </IonLabel>
                   <IonBadge color={COLOR_ESTADO[solicitud.estado]} slot="end">
                     {ETIQUETA_ESTADO[solicitud.estado]}
@@ -80,7 +118,7 @@ const MisTramitesPage: React.FC = () => {
             </IonList>
           )}
         </div>
-        <IonToast isOpen={mensaje !== ''} message={mensaje} duration={3500} color="danger" onDidDismiss={() => setMensaje('')} />
+        <IonToast isOpen={mensaje !== ''} message={mensaje} duration={3500} color={tipoMensaje} onDidDismiss={() => setMensaje('')} />
       </IonContent>
     </IonPage>
   );

@@ -23,7 +23,6 @@ export interface Solicitud {
 
 export interface NuevaSolicitud {
   tramiteId: string;
-  vecinoNombre: string;
   observaciones?: string;
 }
 
@@ -123,9 +122,6 @@ export const getSolicitudes = async (estado?: EstadoSolicitud): Promise<Solicitu
   return (await apiClient.get<BackendSolicitud[]>(`/api/solicitudes${query}`)).map(adaptarSolicitud);
 };
 
-export const getSolicitudesPorVecino = async (_vecinoNombre: string): Promise<Solicitud[]> =>
-  getSolicitudes();
-
 export const getSolicitudById = async (folio: string): Promise<Solicitud | undefined> => {
   try {
     return adaptarSolicitud(
@@ -157,12 +153,15 @@ export const actualizarEstadoSolicitud = async (
     }),
   );
 
+export const cancelarSolicitud = async (folio: string): Promise<void> => {
+  await apiClient.delete(`/api/solicitudes/${encodeURIComponent(folio)}`);
+};
+
 export const getNotificaciones = async (): Promise<Notificacion[]> =>
   (await apiClient.get<BackendNotificacion[]>('/api/notificaciones')).map(adaptarNotificacion);
 
-export const marcarNotificacionLeida = async (id: string): Promise<void> => {
-  await apiClient.patch<{ message: string }>(`/api/notificaciones/${encodeURIComponent(id)}`);
-};
+export const marcarNotificacionLeida = async (id: string): Promise<Notificacion> =>
+  adaptarNotificacion(await apiClient.patch<BackendNotificacion>(`/api/notificaciones/${encodeURIComponent(id)}`));
 
 export const getResumenPorEstado = async (): Promise<Record<EstadoSolicitud, number>> =>
   apiClient.get<Record<EstadoSolicitud, number>>('/api/solicitudes/reportes');

@@ -2,11 +2,12 @@ import { useCallback, useState } from 'react';
 import {
   IonBadge, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle,
   IonCardTitle, IonContent, IonItem, IonLabel, IonList, IonListHeader,
-  IonPage, IonProgressBar, IonSpinner, IonToast, useIonViewWillEnter,
+  IonPage, IonProgressBar, IonSpinner, IonToast,
 } from '@ionic/react';
 import Header from '../../components/common/Header';
 import { COLOR_ESTADO, ETIQUETA_ESTADO, getResumenPorEstado, getSolicitudes, getTramites } from '../../services/tramiteService';
 import type { EstadoSolicitud, Solicitud, Tramite } from '../../services/tramiteService';
+import { useCargarAlEntrar } from '../../hooks/useCargarAlEntrar';
 
 const ESTADOS: EstadoSolicitud[] = ['pendiente', 'en_revision', 'aprobado', 'rechazado'];
 
@@ -34,7 +35,7 @@ const ReportesPage: React.FC = () => {
       .catch((error: unknown) => setMensaje(error instanceof Error ? error.message : 'No se pudieron cargar los reportes.'))
       .finally(() => setCargando(false));
   }, []);
-  useIonViewWillEnter(cargar);
+  useCargarAlEntrar('/funcionario/reportes', cargar);
 
   return (
     <IonPage>

@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
+  actualizarPerfilRequest,
   limpiarSesion,
   loginRequest,
   recuperarSesion,
   registerRequest,
 } from '../services/authService';
 import { UNAUTHORIZED_EVENT } from '../services/apiClient';
-import type { RegisterData, User } from '../services/authService';
+import type { PerfilData, RegisterData, User } from '../services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (data: RegisterData) => Promise<boolean>;
+  actualizarPerfil: (data: PerfilData) => Promise<void>;
   logout: () => void;
 }
 
@@ -56,14 +58,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return true;
   }, []);
 
+  const actualizarPerfil = useCallback(async (data: PerfilData): Promise<void> => {
+    setUser(await actualizarPerfilRequest(data));
+  }, []);
+
   const logout = useCallback((): void => {
     limpiarSesion();
     setUser(null);
   }, []);
 
   const value = useMemo<AuthContextType>(
-    () => ({ user, isAuthenticated: user !== null, isLoading, login, register, logout }),
-    [user, isLoading, login, register, logout],
+    () => ({ user, isAuthenticated: user !== null, isLoading, login, register, actualizarPerfil, logout }),
+    [user, isLoading, login, register, actualizarPerfil, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

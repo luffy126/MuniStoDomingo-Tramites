@@ -13,6 +13,8 @@ Plan Excali Fable5.excalidraw
 # Testing y lint
 coverage/
 .eslintcache
+cypress/screenshots/
+cypress/videos/
 
 # Entorno y logs
 .env

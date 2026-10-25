@@ -1,15 +1,16 @@
 import { useCallback, useState } from 'react';
 import {
   IonBadge, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList,
-  IonPage, IonSpinner, IonTitle, IonToast, IonToolbar, useIonViewWillEnter,
+  IonPage, IonSpinner, IonTitle, IonToast, IonToolbar,
 } from '@ionic/react';
 import { mailOpenOutline, mailUnreadOutline } from 'ionicons/icons';
 import { getNotificaciones, marcarNotificacionLeida } from '../../services/tramiteService';
 import type { Notificacion } from '../../services/tramiteService';
+import { useCargarAlEntrar } from '../../hooks/useCargarAlEntrar';
 
 const NotificacionesPage: React.FC = () => {
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
   const cargar = useCallback((): void => {
@@ -20,13 +21,13 @@ const NotificacionesPage: React.FC = () => {
       .finally(() => setCargando(false));
   }, []);
 
-  useIonViewWillEnter(cargar);
+  useCargarAlEntrar('/vecino/notificaciones', cargar);
 
   const marcarLeida = async (notification: Notificacion): Promise<void> => {
     if (notification.leida) return;
     try {
-      await marcarNotificacionLeida(notification.id);
-      setNotificaciones((current) => current.map((item) => item.id === notification.id ? { ...item, leida: true } : item));
+      const actualizada = await marcarNotificacionLeida(notification.id);
+      setNotificaciones((current) => current.map((item) => item.id === notification.id ? actualizada : item));
     } catch (error) {
       setMensaje(error instanceof Error ? error.message : 'No se pudo actualizar la notificación.');
     }
