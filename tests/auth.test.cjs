@@ -6,6 +6,8 @@ const { spawnSync } = require('node:child_process');
 
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.JWT_EXPIRES_IN = '24h';
+// La suite no depende del .env de quien la ejecuta (p. ej. NODE_ENV=development).
+process.env.NODE_ENV = 'test';
 
 // Sustituir únicamente la persistencia para probar HTTP, bcrypt y JWT sin MySQL.
 const users = [];
@@ -137,21 +139,49 @@ test('Autenticación y autorización a través de HTTP', async (t) => {
     assert.equal(allowed.status, 200);
     assert.deepEqual(Object.keys(allowed.body.data).sort(), ['email', 'id', 'rol']);
   });
-  await t.test('Errores de persistencia: 500 genérico', async () => {
+  await t.test('Errores de persistencia: 500 genérico (también en development)', async () => {
     serviceFailure = true;
+    process.env.NODE_ENV = 'development';
     try {
       for (const path of ['/api/auth/register', '/api/auth/login']) {
         assert.deepEqual(await request(path, credentials), {
           status: 500, body: { success: false, error: 'Error interno del servidor' },
         });
       }
-    } finally { serviceFailure = false; }
+    } finally {
+      serviceFailure = false;
+      process.env.NODE_ENV = 'test';
+    }
   });
   await t.test('JSON malformado: 400; ruta inexistente: 404', async () => {
     const result = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' });
     assert.equal(result.status, 400);
     assert.deepEqual(await result.json(), { success: false, error: 'Datos de entrada inválidos' });
     assert.equal((await request('/inexistente')).status, 404);
+
+    // Un body de más de 16kb lo rechaza body-parser con 413.
+    const grande = await fetch(base + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'a'.repeat(20000) }),
+    });
+    assert.deepEqual({ status: grande.status, body: await grande.json() }, {
+      status: 413, body: { success: false, error: 'Solicitud demasiado grande' },
+    });
+
+    // Un body comprimido inválido (gzip sin comprimir) también es culpa del cliente: 400, no 500.
+    const comprimido = await fetch(base + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' }, body: '{}',
+    });
+    assert.deepEqual({ status: comprimido.status, body: await comprimido.json() }, {
+      status: 400, body: { success: false, error: 'Datos de entrada inválidos' },
+    });
+
+    // Un charset no soportado lo rechaza body-parser con 415: no debe terminar en 500.
+    const charset = await fetch(base + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json; charset=latin1' }, body: '{}',
+    });
+    assert.deepEqual({ status: charset.status, body: await charset.json() }, {
+      status: 415, body: { success: false, error: 'Tipo de contenido no soportado' },
+    });
   });
 });
 

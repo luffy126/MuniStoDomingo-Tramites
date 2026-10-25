@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { createUser, findByEmail, findById } from '../services/userService';
+import { createUser, findByEmail, findById, updateUser } from '../services/userService';
 import type { UsuarioPublico } from '../types';
 import { jwtSecret, jwtOptions } from '../config/jwt';
 
@@ -64,6 +64,34 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
     }
     res.status(200).json({ success: true, data: publicUser(user) });
   } catch (error) {
+    next(error);
+  }
+};
+
+/** PUT /api/auth/me: reemplaza nombre y email. Reemite el token porque el email va en sus claims. */
+export const updateMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { nombre, email } = req.body;
+    const userId = req.user!.id;
+
+    const existente = await findByEmail(email);
+    if (existente && existente.id !== userId) {
+      res.status(409).json({ success: false, error: 'El email ya está registrado' });
+      return;
+    }
+
+    const user = await updateUser(userId, nombre.trim(), email);
+    if (!user) {
+      res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+      return;
+    }
+    res.status(200).json({ success: true, data: session(user) });
+  } catch (error) {
+    // La restricción UNIQUE también cubre cambios concurrentes al mismo correo.
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ER_DUP_ENTRY') {
+      res.status(409).json({ success: false, error: 'El email ya está registrado' });
+      return;
+    }
     next(error);
   }
 };

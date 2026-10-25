@@ -65,11 +65,11 @@ export async function getById(id: string): Promise<TramiteDB | null> {
  * Busca un trámite con sus requisitos en el formato que consume el frontend.
  *
  * @param id Identificador del trámite.
- * @returns El trámite con su lista de requisitos, o null si no existe.
+ * @returns El trámite con su lista de requisitos, o null si no existe o está inactivo.
  */
 export async function getByIdWithRequisitos(id: string): Promise<TramiteConRequisitos | null> {
   const tramite = await getById(id);
-  if (tramite === null) {
+  if (tramite === null || !tramite.activo) {
     return null;
   }
 

@@ -17,10 +17,16 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
   next();
 };
 
+const nombreRule = () => body('nombre')
+  .isString().withMessage('El nombre es obligatorio').bail()
+  .trim().notEmpty().withMessage('El nombre es obligatorio').bail()
+  .isLength({ min: 2, max: 120 }).withMessage('El nombre debe tener entre 2 y 120 caracteres');
+
 const emailRule = () => body('email')
   .isString().withMessage('El email es obligatorio').bail()
   .trim().notEmpty().withMessage('El email es obligatorio').bail()
-  .isEmail().withMessage('El formato del email no es válido')
+  .isEmail().withMessage('El formato del email no es válido').bail()
+  .isLength({ max: 160 }).withMessage('El email no puede superar 160 caracteres')
   .toLowerCase();
 
 const passwordRule = () => body('password')
@@ -28,9 +34,7 @@ const passwordRule = () => body('password')
   .notEmpty().withMessage('La contraseña es obligatoria').bail();
 
 export const validateRegister = [
-  body('nombre').isString().withMessage('El nombre es obligatorio').bail()
-    .trim().notEmpty().withMessage('El nombre es obligatorio').bail()
-    .isLength({ min: 2, max: 120 }).withMessage('El nombre debe tener entre 2 y 120 caracteres'),
+  nombreRule(),
   emailRule(),
   passwordRule()
     .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
@@ -43,3 +47,6 @@ export const validateRegister = [
 ];
 
 export const validateLogin = [emailRule(), passwordRule(), handleValidationErrors];
+
+/** PUT /api/auth/me: reemplaza nombre y email del usuario de la sesión. */
+export const validateUpdateProfile = [nombreRule(), emailRule(), handleValidationErrors];

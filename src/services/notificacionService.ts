@@ -1,4 +1,5 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import type { Connection } from 'mysql2/promise';
 import pool from '../config/database';
 import { NotificacionDB, NotificacionFrontend, formatearFecha } from '../types';
 
@@ -28,15 +29,18 @@ function toFrontend(fila: FilaNotificacion): NotificacionFrontend {
  * @param solicitudId Solicitud relacionada, o null si el aviso es general.
  * @param titulo Título breve.
  * @param mensaje Cuerpo del aviso.
+ * @param db Conexión o pool donde ejecutar el INSERT. Se pasa la conexión de una
+ *           transacción para que el aviso se confirme o revierta junto con ella.
  * @returns La notificación creada en formato frontend.
  */
 export async function create(
   usuarioId: number,
   solicitudId: number | null,
   titulo: string,
-  mensaje: string
+  mensaje: string,
+  db: Connection = pool
 ): Promise<NotificacionFrontend> {
-  const [result] = await pool.execute<ResultSetHeader>(
+  const [result] = await db.execute<ResultSetHeader>(
     'INSERT INTO notificacion (usuario_id, solicitud_id, titulo, mensaje) VALUES (?, ?, ?, ?)',
     [usuarioId, solicitudId, titulo, mensaje]
   );
@@ -57,7 +61,7 @@ export async function create(
  */
 export async function getByUsuario(usuarioId: number): Promise<NotificacionFrontend[]> {
   const [rows] = await pool.execute<FilaNotificacion[]>(
-    'SELECT id, usuario_id, solicitud_id, titulo, mensaje, leida, creada_en FROM notificacion WHERE usuario_id = ? ORDER BY creada_en DESC',
+    'SELECT id, usuario_id, solicitud_id, titulo, mensaje, leida, creada_en FROM notificacion WHERE usuario_id = ? ORDER BY creada_en DESC, id DESC',
     [usuarioId]
   );
   return rows.map(toFrontend);
@@ -68,12 +72,18 @@ export async function getByUsuario(usuarioId: number): Promise<NotificacionFront
  *
  * @param id Id numérico de la notificación.
  * @param usuarioId Id del usuario que hace la petición.
- * @returns true si existía, era suya y se actualizó; false en otro caso.
+ * @returns La notificación ya marcada como leída, o null si no existe o es de otro usuario.
+ *          Es idempotente: marcar una notificación ya leída también la devuelve.
  */
-export async function markAsRead(id: number, usuarioId: number): Promise<boolean> {
-  const [result] = await pool.execute<ResultSetHeader>(
+export async function markAsRead(id: number, usuarioId: number): Promise<NotificacionFrontend | null> {
+  await pool.execute(
     'UPDATE notificacion SET leida = TRUE WHERE id = ? AND usuario_id = ?',
     [id, usuarioId]
   );
-  return result.affectedRows > 0;
+
+  const [rows] = await pool.execute<FilaNotificacion[]>(
+    'SELECT id, usuario_id, solicitud_id, titulo, mensaje, leida, creada_en FROM notificacion WHERE id = ? AND usuario_id = ?',
+    [id, usuarioId]
+  );
+  return rows.length === 0 ? null : toFrontend(rows[0]);
 }

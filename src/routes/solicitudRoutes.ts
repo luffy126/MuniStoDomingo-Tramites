@@ -7,6 +7,7 @@ import {
   obtenerSolicitud,
   actualizarEstado,
   obtenerReportes,
+  cancelarSolicitud,
 } from '../controllers/solicitudController';
 
 const router = Router();
@@ -29,5 +30,8 @@ router.get('/:id', obtenerSolicitud);
 
 // Funcionario cambia el estado
 router.patch('/:id', roleMiddleware('funcionario'), actualizarEstado);
+
+// Vecino cancela su solicitud mientras siga pendiente
+router.delete('/:id', roleMiddleware('vecino'), cancelarSolicitud);
 
 export default router;

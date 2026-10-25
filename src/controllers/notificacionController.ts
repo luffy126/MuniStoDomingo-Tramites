@@ -21,7 +21,7 @@ export const listarNotificaciones = async (
 
 /**
  * PATCH /api/notificaciones/:id
- * Marca una notificación como leída.
+ * Marca una notificación como leída y devuelve la notificación actualizada.
  */
 export const marcarLeida = async (
   req: Request,
@@ -37,14 +37,14 @@ export const marcarLeida = async (
     }
     const id = Number(param);
 
-    const resultado = await notificacionService.markAsRead(id, req.user!.id);
+    const notificacion = await notificacionService.markAsRead(id, req.user!.id);
 
-    if (!resultado) {
+    if (!notificacion) {
       res.status(404).json({ success: false, error: 'Notificación no encontrada' });
       return;
     }
 
-    res.status(200).json({ success: true, data: { message: 'Notificación marcada como leída' } });
+    res.status(200).json({ success: true, data: notificacion });
   } catch (err) {
     next(err);
   }
