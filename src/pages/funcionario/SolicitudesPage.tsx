@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   IonBadge, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel,
   IonList, IonMenuButton, IonPage, IonSegment, IonSegmentButton, IonSpinner,
-  IonText, IonTitle, IonToast, IonToolbar, useIonViewWillEnter,
+  IonText, IonTitle, IonToast, IonToolbar,
 } from '@ionic/react';
 import { fileTrayOutline } from 'ionicons/icons';
 import { COLOR_ESTADO, ETIQUETA_ESTADO, getSolicitudes, getTramites } from '../../services/tramiteService';
 import type { EstadoSolicitud, Solicitud, Tramite } from '../../services/tramiteService';
+import { useCargarAlEntrar } from '../../hooks/useCargarAlEntrar';
 
 type FiltroEstado = EstadoSolicitud | 'todos';
 const FILTROS: FiltroEstado[] = ['todos', 'pendiente', 'en_revision', 'aprobado', 'rechazado'];
@@ -28,7 +29,7 @@ const SolicitudesPage: React.FC = () => {
       .catch((error: unknown) => setMensaje(error instanceof Error ? error.message : 'No se pudieron cargar las solicitudes.'))
       .finally(() => setCargando(false));
   }, []);
-  useIonViewWillEnter(cargar);
+  useCargarAlEntrar('/funcionario/solicitudes', cargar);
 
   const visibles = useMemo(() => filtro === 'todos' ? solicitudes : solicitudes.filter((item) => item.estado === filtro), [solicitudes, filtro]);
   return (

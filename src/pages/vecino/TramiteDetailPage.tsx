@@ -7,14 +7,12 @@ import {
 } from '@ionic/react';
 import { checkmarkCircleOutline } from 'ionicons/icons';
 import Header from '../../components/common/Header';
-import { useAuth } from '../../context/AuthContext';
 import { ETIQUETA_CATEGORIA, crearSolicitud, getTramiteById } from '../../services/tramiteService';
 import type { Tramite } from '../../services/tramiteService';
 import { getIcono } from '../../utils/iconos';
 
 const TramiteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [tramite, setTramite] = useState<Tramite>();
   const [cargando, setCargando] = useState(true);
@@ -42,7 +40,7 @@ const TramiteDetailPage: React.FC = () => {
     if (!tramite) return;
     setEnviando(true);
     try {
-      await crearSolicitud({ tramiteId: tramite.id, vecinoNombre: user?.nombre ?? '', observaciones: observaciones.trim() || undefined });
+      await crearSolicitud({ tramiteId: tramite.id, observaciones: observaciones.trim() || undefined });
       setTipoMensaje('success');
       setMensaje('Solicitud enviada correctamente.');
       setObservaciones('');

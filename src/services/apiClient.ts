@@ -40,6 +40,9 @@ const apiClient = async <T>(path: string, options: RequestInit = {}): Promise<T>
     throw new Error('No se pudo conectar con el servidor. Revisa que el backend esté ejecutándose.');
   }
 
+  // Las respuestas 204 (p. ej. cancelar una solicitud) no traen cuerpo que parsear.
+  if (response.status === 204) return undefined as T;
+
   let body: ApiEnvelope<T>;
   try {
     body = (await response.json()) as ApiEnvelope<T>;
@@ -68,6 +71,9 @@ export default {
   get: <T>(path: string): Promise<T> => apiClient<T>(path),
   post: <T>(path: string, data: unknown): Promise<T> =>
     apiClient<T>(path, { method: 'POST', body: JSON.stringify(data) }),
+  put: <T>(path: string, data: unknown): Promise<T> =>
+    apiClient<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
   patch: <T>(path: string, data?: unknown): Promise<T> =>
     apiClient<T>(path, { method: 'PATCH', ...(data === undefined ? {} : { body: JSON.stringify(data) }) }),
+  delete: <T = void>(path: string): Promise<T> => apiClient<T>(path, { method: 'DELETE' }),
 };
