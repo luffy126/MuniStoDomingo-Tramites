@@ -83,9 +83,14 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 
 ### Pruebas
 
-`tests/auth.test.cjs` prueba auth y roles con la persistencia simulada. `tests/api.test.cjs`
+`tests/auth.test.cjs` prueba auth y roles con la persistencia simulada.
+`tests/security.test.cjs` comprueba los headers de Helmet, límites de peticiones y
+validación de texto libre sin necesitar una base de datos. `tests/api.test.cjs`
 prueba **toda la API contra una base real** (registro, solicitudes, folios simultáneos,
 permisos por dueño, notificaciones, reportes).
+
+Las medidas implementadas y sus comprobaciones manuales están en
+[docs/SEGURIDAD.md](docs/SEGURIDAD.md).
 
 La base de pruebas se llama `muni_stodomingo_test`: se **borra y recrea desde `schema.sql`**
 en cada ejecución, y nunca usa el `DB_NAME` del `.env`. Con XAMPP (MySQL encendido, `root` sin

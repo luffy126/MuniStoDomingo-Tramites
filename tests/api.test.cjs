@@ -6,7 +6,7 @@
 //
 // Conexión (todas opcionales): TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER,
 // TEST_DB_PASSWORD, TEST_DB_NAME. Ver README, sección "Pruebas".
-const { test, before, after } = require('node:test');
+const { test, before, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -34,6 +34,13 @@ Object.assign(process.env, {
 const mysql = require('mysql2/promise');
 const app = require('../dist/app').default;
 const pool = require('../dist/config/database').default;
+const { authLimiter, generalLimiter } = require('../dist/middleware/rateLimiter');
+
+// Aislar ventanas entre escenarios sin desactivar los límites de producción.
+beforeEach(() => {
+  authLimiter.resetKey('127.0.0.1');
+  generalLimiter.resetKey('127.0.0.1');
+});
 
 let server;
 let base;

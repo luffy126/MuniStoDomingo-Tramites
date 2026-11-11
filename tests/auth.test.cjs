@@ -1,4 +1,4 @@
-const { test } = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const { once } = require('node:events');
@@ -34,6 +34,13 @@ const bcrypt = require('bcrypt');
 const app = require('../dist/app').default;
 const { authMiddleware } = require('../dist/middleware/authMiddleware');
 const { roleMiddleware } = require('../dist/middleware/roleMiddleware');
+const { authLimiter, generalLimiter } = require('../dist/middleware/rateLimiter');
+
+// Cada escenario tiene su propia ventana; no se desactiva el middleware real.
+beforeEach(() => {
+  authLimiter.resetKey('127.0.0.1');
+  generalLimiter.resetKey('127.0.0.1');
+});
 
 test('Autenticación y autorización a través de HTTP', async (t) => {
   const harness = express();
