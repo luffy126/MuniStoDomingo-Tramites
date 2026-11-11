@@ -1,4 +1,4 @@
-import { body, validationResult } from 'express-validator';
+import { body, validationResult, type ValidationChain } from 'express-validator';
 import type { Request, Response, NextFunction } from 'express';
 
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
@@ -17,10 +17,32 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
   next();
 };
 
-const nombreRule = () => body('nombre')
-  .isString().withMessage('El nombre es obligatorio').bail()
-  .trim().notEmpty().withMessage('El nombre es obligatorio').bail()
-  .isLength({ min: 2, max: 120 }).withMessage('El nombre debe tener entre 2 y 120 caracteres');
+/** Rechaza HTML y atributos de eventos sin alterar caracteres normales como & o tildes. */
+const noHtmlTags = (chain: ValidationChain): ValidationChain =>
+  chain.custom((value: string) => {
+    if (/<[^>]*>/i.test(value)) {
+      throw new Error('El texto no puede contener etiquetas HTML');
+    }
+    if (/on\w+\s*=/i.test(value)) {
+      throw new Error('El texto contiene contenido no permitido');
+    }
+    return true;
+  });
+
+const nombreRule = () => noHtmlTags(
+  body('nombre')
+    .isString().withMessage('El nombre es obligatorio').bail()
+    .trim().notEmpty().withMessage('El nombre es obligatorio').bail()
+    .isLength({ min: 2, max: 120 }).withMessage('El nombre debe tener entre 2 y 120 caracteres').bail()
+);
+
+const observacionesRule = () => noHtmlTags(
+  body('observaciones')
+    .optional()
+    .isString().withMessage('observaciones debe ser texto').bail()
+    .trim()
+    .isLength({ max: 1000 }).withMessage('Las observaciones no pueden superar 1000 caracteres').bail()
+);
 
 const emailRule = () => body('email')
   .isString().withMessage('El email es obligatorio').bail()
@@ -50,3 +72,21 @@ export const validateLogin = [emailRule(), passwordRule(), handleValidationError
 
 /** PUT /api/auth/me: reemplaza nombre y email del usuario de la sesión. */
 export const validateUpdateProfile = [nombreRule(), emailRule(), handleValidationErrors];
+
+/** POST /api/solicitudes: trámite requerido y observaciones opcionales de texto plano. */
+export const validateCrearSolicitud = [
+  body('tramiteId')
+    .isString().withMessage('tramiteId es requerido').bail()
+    .trim().notEmpty().withMessage('tramiteId es requerido'),
+  observacionesRule(),
+  handleValidationErrors,
+];
+
+/** PATCH /api/solicitudes/:id: el controlador valida el estado y su transición. */
+export const validateActualizarEstado = [
+  body('estado')
+    .isString().withMessage('estado es requerido').bail()
+    .trim().notEmpty().withMessage('estado es requerido'),
+  observacionesRule(),
+  handleValidationErrors,
+];
