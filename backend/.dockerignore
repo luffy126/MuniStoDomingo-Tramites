@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.git
+tests
+docs
+postman_collection.json
+README.md
+Dockerfile
+.dockerignore

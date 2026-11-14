@@ -1,0 +1,85 @@
+# MuniStoDomingo-Tramites — orquestación completa (MariaDB + API + frontend)
+# Uso: docker compose --env-file .env.docker up --build
+name: munistodomingo
+
+services:
+  # ── Base de datos ────────────────────────────────
+  db:
+    image: mariadb:11
+    container_name: muni-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-devpass}
+      MARIADB_DATABASE: ${DB_NAME:-muni_stodomingo}
+      MARIADB_USER: ${DB_USER:-muniapp}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-munipass}
+    ports:
+      - "${DB_EXTERNAL_PORT:-3307}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # Solo se ejecuta con el volumen vacío (primer arranque o tras `down -v`)
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - muni-net
+
+  # ── Backend (API) ───────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: muni-backend
+    container_name: muni-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db            # nombre del servicio, no localhost
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-muniapp}
+      DB_PASSWORD: ${DB_PASSWORD:-munipass}
+      DB_NAME: ${DB_NAME:-muni_stodomingo}
+      JWT_SECRET: ${JWT_SECRET:-clave_super_segura_de_al_menos_32_caracteres_aqui}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      FRONTEND_URL: http://localhost:${FRONTEND_PORT:-8080}
+      TRUST_PROXY: 1         # confía en 1 salto (Nginx) para la IP real en el rate limit
+      # Servicio de email (Resend). Sin API key el backend hace dry run (log en consola).
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-MuniStoDomingo <onboarding@resend.dev>}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    networks:
+      - muni-net
+
+  # ── Frontend (Nginx + SPA) ──────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /      # rutas relativas → el proxy de Nginx reenvía /api/
+    image: muni-frontend
+    container_name: muni-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    networks:
+      - muni-net
+
+volumes:
+  db_data:
+
+networks:
+  muni-net:
+    driver: bridge
