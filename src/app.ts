@@ -13,6 +13,12 @@ const app = express();
 
 // ── Middlewares globales ──────────────────────────
 app.disable('x-powered-by');
+// Detrás de un proxy reverso (Nginx en Docker) la IP real viene en X-Forwarded-For.
+// Sin esto, el rate limit vería a todos los clientes con la IP del proxy.
+if (process.env.TRUST_PROXY) {
+  const hops = Number(process.env.TRUST_PROXY);
+  app.set('trust proxy', Number.isInteger(hops) ? hops : process.env.TRUST_PROXY);
+}
 app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:8100',
