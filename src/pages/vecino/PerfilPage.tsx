@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
+import { IonButtons,
   IonButton,
   IonCard,
   IonCardContent,
@@ -24,6 +24,7 @@ import {
 import { logOutOutline, mailOutline, personCircleOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { useAuth } from '../../context/AuthContext';
 import { esEmailValido } from '../../utils/validators';
+import { TemaBoton, TemaItem } from '../../components/common/TemaToggle';
 
 interface ErroresPerfil {
   nombre?: string;
@@ -84,7 +85,7 @@ const PerfilPage: React.FC = () => {
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>Mi perfil</IonTitle>
-        </IonToolbar>
+        <IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar>
       </IonHeader>
       <IonContent>
         <div className="contenedor-pagina">
@@ -164,6 +165,7 @@ const PerfilPage: React.FC = () => {
                 <p>{user?.rol === 'funcionario' ? 'Funcionario municipal' : 'Vecino'}</p>
               </IonLabel>
             </IonItem>
+            <TemaItem />
           </IonList>
 
           <IonButton expand="block" color="danger" onClick={cerrarSesion}>

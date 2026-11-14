@@ -19,8 +19,9 @@ import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
-/* Modo oscuro según la preferencia del sistema */
-import '@ionic/react/css/palettes/dark.system.css';
+/* Modo oscuro por clase: lo activa useTema (preferencia guardada o del sistema) */
+import '@ionic/react/css/palettes/dark.class.css';
+import './hooks/useTema';
 
 /* Theme variables */
 import './theme/variables.css';

@@ -1,3 +1,4 @@
+import { TemaBoton } from './TemaToggle';
 import { IonBackButton, IonButtons, IonHeader, IonMenuButton, IonTitle, IonToolbar } from '@ionic/react';
 
 interface HeaderProps {
@@ -14,7 +15,7 @@ const Header: React.FC<HeaderProps> = ({ titulo, rutaVolver, conMenu = false }) 
         {rutaVolver !== undefined ? <IonBackButton defaultHref={rutaVolver} text="Volver" /> : null}
       </IonButtons>
       <IonTitle>{titulo}</IonTitle>
-    </IonToolbar>
+    <IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar>
   </IonHeader>
 );
 

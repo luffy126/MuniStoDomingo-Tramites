@@ -1,6 +1,7 @@
+import { TemaBoton } from '../../components/common/TemaToggle';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
+import { IonButtons,
   IonChip,
   IonContent,
   IonHeader,
@@ -52,7 +53,7 @@ const DashboardPage: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar color="primary"><IonTitle>Catálogo de trámites</IonTitle></IonToolbar>
+        <IonToolbar color="primary"><IonTitle>Catálogo de trámites</IonTitle><IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar>
         <IonToolbar>
           <IonSearchbar placeholder="Buscar trámite" value={busqueda} onIonInput={(event) => setBusqueda(event.detail.value ?? '')} />
         </IonToolbar>

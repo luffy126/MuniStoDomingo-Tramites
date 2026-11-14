@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import {
   IonContent,
   IonHeader,
@@ -20,6 +20,8 @@ import SolicitudesPage from './SolicitudesPage';
 import SolicitudDetailPage from './SolicitudDetailPage';
 import ReportesPage from './ReportesPage';
 import { useAuth } from '../../context/AuthContext';
+import Redireccion from '../../routes/Redireccion';
+import { TemaItem } from '../../components/common/TemaToggle';
 
 const FuncionarioLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -61,6 +63,7 @@ const FuncionarioLayout: React.FC = () => {
                 <IonLabel color="danger">Cerrar sesión</IonLabel>
               </IonItem>
             </IonMenuToggle>
+            <TemaItem lines="none" />
           </IonList>
         </IonContent>
       </IonMenu>
@@ -70,7 +73,7 @@ const FuncionarioLayout: React.FC = () => {
           <Route path="/funcionario/solicitudes" element={<SolicitudesPage />} />
           <Route path="/funcionario/solicitud/:id" element={<SolicitudDetailPage />} />
           <Route path="/funcionario/reportes" element={<ReportesPage />} />
-          <Route path="/funcionario/*" element={<Navigate to="/funcionario/solicitudes" replace />} />
+          <Route path="/funcionario/*" element={<Redireccion a="/funcionario/solicitudes" />} />
         </Routes>
       </IonRouterOutlet>
     </IonSplitPane>
