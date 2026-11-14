@@ -8,6 +8,9 @@ const { once } = require('node:events');
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.JWT_EXPIRES_IN = '24h';
 process.env.NODE_ENV = 'test';
+// El .env de desarrollo puede traer TRUST_PROXY; aquí se prueba el servidor SIN proxy de confianza.
+process.env.TRUST_PROXY = '';
+process.env.RESEND_API_KEY = '';
 
 const writes = [];
 function stubService(name, exports) {

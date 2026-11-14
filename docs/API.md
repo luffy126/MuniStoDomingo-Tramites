@@ -30,6 +30,31 @@ Todos los ejemplos de respuesta son reales, obtenidos con los datos semilla de `
 El frontend puede revisar siempre `success` primero; `data` solo existe cuando es `true` y
 `error` solo cuando es `false`.
 
+### Paginación
+
+`GET /api/solicitudes` y `GET /api/notificaciones` responden de a páginas. `data` sigue
+siendo el arreglo de elementos y los metadatos viajan al lado, en `pagination`:
+
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "pagination": { "page": 1, "limit": 20, "total": 47, "totalPages": 3, "hasNext": true, "hasPrev": false }
+}
+```
+
+| Parámetro | Por defecto | Reglas |
+|---|---|---|
+| `page` | `1` | Entero desde 1. Una página más allá del final responde `data: []`, no error |
+| `limit` | `20` | Entero entre 1 y 100. Un valor mayor se recorta a 100 |
+
+Un valor inválido (`page=abc`, `limit=-1`) se reemplaza por el valor por defecto; no produce
+un 400. `total` cuenta todos los elementos que cumplen el filtro, no solo los de la página.
+
+> **Importante para quien consuma la API:** sin `page` ni `limit` solo llegan los primeros
+> 20 elementos. Para mostrar un listado completo hay que seguir pidiendo páginas mientras
+> `hasNext` sea `true`.
+
 ### Códigos HTTP
 
 | Código | Significado en esta API |
@@ -374,10 +399,13 @@ envía en el body: se toma de la sesión. El folio lo genera el servidor.
 - **Vecino**: devuelve solo sus solicitudes.
 - **Funcionario**: devuelve todas. Acepta el filtro opcional `?estado=`.
 
-Ordenadas de la más reciente a la más antigua.
+Ordenadas de la más reciente a la más antigua. [Paginado](#paginación): acepta `?page=` y
+`?limit=` y la respuesta incluye `pagination`. Con `?estado=`, `total` cuenta solo las
+solicitudes de ese estado.
 
 ```
 GET /api/solicitudes
+GET /api/solicitudes?page=2&limit=10
 GET /api/solicitudes?estado=pendiente     (solo funcionario)
 ```
 
@@ -402,7 +430,8 @@ GET /api/solicitudes?estado=pendiente     (solo funcionario)
       "fecha": "2026-09-12",
       "estado": "pendiente"
     }
-  ]
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 2, "totalPages": 1, "hasNext": false, "hasPrev": false }
 }
 ```
 
@@ -539,7 +568,9 @@ endpoint para crearlas.
 
 ### `GET /api/notificaciones`
 
-De la más reciente a la más antigua.
+De la más reciente a la más antigua. [Paginado](#paginación): acepta `?page=` y `?limit=`.
+Aquí `pagination` trae además `unread`, la cantidad de avisos sin leer del usuario en
+**todas** las páginas (sirve para el contador de la interfaz sin recorrer el listado).
 
 **200**
 
@@ -554,7 +585,8 @@ De la más reciente a la más antigua.
       "fecha": "2026-09-16",
       "leida": false
     }
-  ]
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1, "hasNext": false, "hasPrev": false, "unread": 1 }
 }
 ```
 

@@ -29,11 +29,16 @@ Object.assign(process.env, {
   DB_HOST: dbConfig.host, DB_PORT: String(dbConfig.port), DB_USER: dbConfig.user,
   DB_PASSWORD: dbConfig.password, DB_NAME: dbName,
   JWT_SECRET: randomBytes(48).toString('hex'), JWT_EXPIRES_IN: '24h', NODE_ENV: 'test',
+  // Sin clave: el servicio de email queda en dry run y ninguna prueba llama a Resend.
+  RESEND_API_KEY: '', EMAIL_REDIRECT_TO: '',
+  // Sin proxy de confianza, aunque el .env de desarrollo lo configure.
+  TRUST_PROXY: '',
 });
 
 const mysql = require('mysql2/promise');
 const app = require('../dist/app').default;
 const pool = require('../dist/config/database').default;
+const emailService = require('../dist/services/emailService');
 const { authLimiter, generalLimiter } = require('../dist/middleware/rateLimiter');
 
 // Aislar ventanas entre escenarios sin desactivar los límites de producción.
@@ -513,6 +518,191 @@ test('Integridad de la base de datos', async (t) => {
       pool.query("INSERT INTO usuario (nombre, email, password_hash, rol) VALUES ('Repetido', 'vecino@test.com', 'x', 'vecino')"),
       { code: 'ER_DUP_ENTRY' },
     );
+  });
+});
+
+test('Paginación de listados (EF4)', async (t) => {
+  let token, vecinoId, funcionario;
+  t.before(async () => {
+    const registro = await registrarVecino('paginas@correo.cl');
+    token = registro.token;
+    vecinoId = registro.user.id;
+    funcionario = await login('funcionario@test.com');
+    // 25 solicitudes y 25 avisos con la MISMA fecha: obliga a que el orden desempate por id.
+    for (let i = 1; i <= 25; i += 1) {
+      await pool.query(
+        "INSERT INTO solicitud (folio, tramite_id, vecino_id, creada_en) VALUES (?, 'cert-residencia', ?, '2026-01-01 10:00:00')",
+        [`PAG-${String(i).padStart(2, '0')}`, vecinoId]
+      );
+      await pool.query(
+        "INSERT INTO notificacion (usuario_id, titulo, mensaje, leida, creada_en) VALUES (?, ?, 'x', ?, '2026-01-01 10:00:00')",
+        [vecinoId, `Aviso ${i}`, i <= 7]
+      );
+    }
+  });
+  t.after(async () => {
+    await pool.query('DELETE FROM notificacion WHERE usuario_id = ?', [vecinoId]);
+    await pool.query('DELETE FROM solicitud WHERE vecino_id = ?', [vecinoId]);
+  });
+
+  await t.test('Sin parámetros: primera página de 20 con sus metadatos', async () => {
+    const r = await api('GET', '/api/solicitudes', { token });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.length, 20);
+    assert.deepEqual(r.body.pagination, {
+      page: 1, limit: 20, total: 25, totalPages: 2, hasNext: true, hasPrev: false,
+    });
+  });
+
+  await t.test('Recorrer las páginas entrega cada solicitud una sola vez y en orden', async () => {
+    const vistas = [];
+    for (const [page, esperadas] of [[1, 10], [2, 10], [3, 5]]) {
+      const r = await api('GET', `/api/solicitudes?page=${page}&limit=10`, { token });
+      assert.equal(r.body.data.length, esperadas);
+      assert.equal(r.body.pagination.totalPages, 3);
+      assert.equal(r.body.pagination.hasNext, page < 3);
+      assert.equal(r.body.pagination.hasPrev, page > 1);
+      vistas.push(...r.body.data.map((s) => s.id));
+    }
+    assert.equal(new Set(vistas).size, 25);
+    // Misma fecha: el desempate es por id descendente (la última insertada primero).
+    assert.equal(vistas[0], 'PAG-25');
+    assert.equal(vistas[24], 'PAG-01');
+  });
+
+  await t.test('Una página más allá del final responde vacía, no error', async () => {
+    const r = await api('GET', '/api/solicitudes?page=9&limit=10', { token });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body.data, []);
+    assert.equal(r.body.pagination.total, 25);
+    assert.equal(r.body.pagination.hasNext, false);
+    assert.equal(r.body.pagination.hasPrev, true);
+  });
+
+  await t.test('Valores inválidos o excesivos se normalizan sin responder 500', async () => {
+    for (const query of ['page=abc&limit=xyz', 'page=-3&limit=0', 'page=1.5&limit=2e1', 'page=1&page=2&limit=5&limit=6']) {
+      const r = await api('GET', `/api/solicitudes?${query}`, { token });
+      assert.equal(r.status, 200, query);
+      assert.equal(r.body.pagination.page, 1, query);
+      assert.equal(r.body.pagination.limit, 20, query);
+    }
+    const grande = await api('GET', '/api/solicitudes?limit=5000', { token });
+    assert.equal(grande.body.pagination.limit, 100);
+    assert.equal(grande.body.data.length, 25);
+    const lejos = await api('GET', '/api/solicitudes?page=999999999&limit=100', { token });
+    assert.equal(lejos.status, 200);
+    assert.deepEqual(lejos.body.data, []);
+  });
+
+  await t.test('El total del funcionario respeta el filtro por estado', async () => {
+    const [[{ n }]] = await pool.query("SELECT COUNT(*) AS n FROM solicitud WHERE estado = 'pendiente'");
+    const r = await api('GET', '/api/solicitudes?estado=pendiente&limit=5', { token: funcionario });
+    assert.equal(r.body.pagination.total, n);
+    assert.equal(r.body.data.length, 5);
+    assert.ok(r.body.data.every((s) => s.estado === 'pendiente'));
+    const [[{ todas }]] = await pool.query('SELECT COUNT(*) AS todas FROM solicitud');
+    assert.equal((await api('GET', '/api/solicitudes?limit=1', { token: funcionario })).body.pagination.total, todas);
+  });
+
+  await t.test('Notificaciones: páginas, total y no leídas de todas las páginas', async () => {
+    const r = await api('GET', '/api/notificaciones?page=2&limit=10', { token });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.length, 10);
+    assert.deepEqual(r.body.pagination, {
+      page: 2, limit: 10, total: 25, totalPages: 3, hasNext: true, hasPrev: true, unread: 18,
+    });
+    assert.equal(r.body.data[0].titulo, 'Aviso 15');
+    const sinAvisos = await api('GET', '/api/notificaciones', { token: (await registrarVecino('sinavisos@correo.cl')).token });
+    assert.deepEqual(sinAvisos.body.pagination, {
+      page: 1, limit: 20, total: 0, totalPages: 1, hasNext: false, hasPrev: false, unread: 0,
+    });
+  });
+});
+
+test('Aviso por email al cambiar el estado (EF5)', async (t) => {
+  let funcionario, vecino;
+  const enviados = [];
+  /** Espera a que el envío en segundo plano ocurra (va después de la respuesta HTTP). */
+  const esperarEnvios = async (cantidad) => {
+    for (let i = 0; i < 100 && enviados.length < cantidad; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  const crearSolicitud = async () =>
+    (await api('POST', '/api/solicitudes', { token: vecino, body: { tramiteId: 'cert-residencia' } })).body.data.id;
+
+  t.before(async () => {
+    funcionario = await login('funcionario@test.com');
+    vecino = (await registrarVecino('correo.real@correo.cl')).token;
+  });
+  t.beforeEach(() => {
+    enviados.length = 0;
+    emailService.setEmailSender(async (email) => { enviados.push(email); return true; });
+  });
+  t.after(() => {
+    emailService.setEmailSender();
+    delete process.env.EMAIL_REDIRECT_TO;
+  });
+
+  await t.test('Un cambio de estado envía un correo al vecino dueño', async () => {
+    const folio = await crearSolicitud();
+    const r = await api('PATCH', `/api/solicitudes/${folio}`, {
+      token: funcionario, body: { estado: 'rechazado', observaciones: 'Falta el comprobante & la firma' },
+    });
+    assert.equal(r.status, 200);
+    await esperarEnvios(1);
+    assert.equal(enviados.length, 1);
+    const [email] = enviados;
+    assert.equal(email.to, 'correo.real@correo.cl');
+    assert.equal(email.subject, `Solicitud ${folio}: Rechazada`);
+    assert.ok(email.html.includes('Certificado de residencia'));
+    assert.ok(email.html.includes('Falta el comprobante &amp; la firma'));
+    assert.ok(email.text.includes('Observaciones: Falta el comprobante & la firma'));
+  });
+
+  await t.test('Si el proveedor de correo falla, el cambio de estado se guarda igual', async () => {
+    emailService.setEmailSender(async () => { throw new Error('Resend caído'); });
+    const folio = await crearSolicitud();
+    // El fallo se registra con console.error; se silencia para no ensuciar la salida.
+    const original = console.error;
+    const errores = [];
+    console.error = (...args) => errores.push(args.join(' '));
+    try {
+      const r = await api('PATCH', `/api/solicitudes/${folio}`, { token: funcionario, body: { estado: 'aprobado' } });
+      assert.equal(r.status, 200);
+      for (let i = 0; i < 100 && errores.length === 0; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    } finally {
+      console.error = original;
+    }
+    assert.ok(errores.some((e) => e.includes('Resend caído')));
+    const [[fila]] = await pool.query('SELECT estado FROM solicitud WHERE folio = ?', [folio]);
+    assert.equal(fila.estado, 'aprobado');
+    const [[{ n }]] = await pool.query(
+      'SELECT COUNT(*) AS n FROM notificacion WHERE solicitud_id = (SELECT id FROM solicitud WHERE folio = ?)', [folio]);
+    assert.equal(n, 1);
+  });
+
+  await t.test('Un cambio rechazado (409) o inexistente (404) no envía correo', async () => {
+    const folio = await crearSolicitud();
+    await api('PATCH', `/api/solicitudes/${folio}`, { token: funcionario, body: { estado: 'aprobado' } });
+    await esperarEnvios(1);
+    enviados.length = 0;
+    assert.equal((await api('PATCH', `/api/solicitudes/${folio}`, { token: funcionario, body: { estado: 'rechazado' } })).status, 409);
+    assert.equal((await api('PATCH', '/api/solicitudes/SOL-0', { token: funcionario, body: { estado: 'aprobado' } })).status, 404);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(enviados.length, 0);
+  });
+
+  await t.test('EMAIL_REDIRECT_TO desvía el correo y conserva el destinatario en el asunto', async () => {
+    process.env.EMAIL_REDIRECT_TO = 'demo@correo.cl';
+    const folio = await crearSolicitud();
+    await api('PATCH', `/api/solicitudes/${folio}`, { token: funcionario, body: { estado: 'en_revision' } });
+    await esperarEnvios(1);
+    assert.equal(enviados[0].to, 'demo@correo.cl');
+    assert.equal(enviados[0].subject, `[para correo.real@correo.cl] Solicitud ${folio}: En revisión`);
+    delete process.env.EMAIL_REDIRECT_TO;
   });
 });
 

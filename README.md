@@ -83,6 +83,7 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 
 ### Pruebas
 
+`tests/unit.test.cjs` prueba la paginación y el armado del correo sin base de datos ni red.
 `tests/auth.test.cjs` prueba auth y roles con la persistencia simulada.
 `tests/security.test.cjs` comprueba los headers de Helmet, límites de peticiones y
 validación de texto libre sin necesitar una base de datos. `tests/api.test.cjs`

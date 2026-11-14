@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as solicitudService from '../services/solicitudService';
 import * as tramiteService from '../services/tramiteService';
 import type { EstadoSolicitud } from '../types';
+import { parsePagination } from '../utils/pagination';
 
 const ESTADOS_VALIDOS: EstadoSolicitud[] = ['pendiente', 'en_revision', 'aprobado', 'rechazado'];
 
@@ -51,6 +52,8 @@ export const crearSolicitud = async (
  * GET /api/solicitudes
  * - Si el usuario es vecino → devuelve solo las suyas.
  * - Si es funcionario → devuelve todas, opcionalmente filtradas por ?estado=
+ * Paginado con ?page= (por defecto 1) y ?limit= (por defecto 20, máximo 100).
+ * Responde { success, data: [...], pagination: { page, limit, total, totalPages, hasNext, hasPrev } }.
  */
 export const listarSolicitudes = async (
   req: Request,
@@ -59,10 +62,11 @@ export const listarSolicitudes = async (
 ): Promise<void> => {
   try {
     const user = req.user!;
+    const pagination = parsePagination(req.query);
 
     if (user.rol === 'vecino') {
-      const solicitudes = await solicitudService.getByVecino(user.id);
-      res.status(200).json({ success: true, data: solicitudes });
+      const pagina = await solicitudService.getByVecino(user.id, pagination);
+      res.status(200).json({ success: true, data: pagina.items, pagination: pagina.pagination });
       return;
     }
 
@@ -75,8 +79,8 @@ export const listarSolicitudes = async (
       return;
     }
 
-    const solicitudes = await solicitudService.getAll(estado);
-    res.status(200).json({ success: true, data: solicitudes });
+    const pagina = await solicitudService.getAll(estado, pagination);
+    res.status(200).json({ success: true, data: pagina.items, pagination: pagina.pagination });
   } catch (err) {
     next(err);
   }
