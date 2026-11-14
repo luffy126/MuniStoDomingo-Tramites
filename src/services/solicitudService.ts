@@ -8,7 +8,16 @@ import {
   SolicitudFrontend,
   formatearFecha,
 } from '../types';
+import * as emailService from './emailService';
 import * as notificacionService from './notificacionService';
+import * as userService from './userService';
+import {
+  PRIMERA_PAGINA,
+  PaginatedResult,
+  PaginationParams,
+  buildPaginationMeta,
+  limitOffset,
+} from '../utils/pagination';
 
 /** Fila del SELECT base: la solicitud más el nombre del vecino que la ingresó. */
 interface FilaSolicitud extends RowDataPacket, SolicitudDB {
@@ -27,6 +36,11 @@ interface FilaActual extends RowDataPacket {
 /** Nombre de un trámite, para el texto del aviso. */
 interface FilaTramiteNombre extends RowDataPacket {
   nombre: string;
+}
+
+/** Fila de un COUNT(*). */
+interface FilaTotal extends RowDataPacket {
+  total: number;
 }
 
 /** Datos mínimos para decidir por qué no se pudo cancelar una solicitud. */
@@ -111,35 +125,71 @@ export async function create(
 }
 
 /**
- * Lista las solicitudes de un vecino, de la más reciente a la más antigua.
- *
- * @param vecinoId Id del vecino dueño de las solicitudes.
+ * Orden de los listados. `s.id` desempata las solicitudes creadas en el mismo
+ * segundo: sin un orden total, dos páginas consecutivas podrían repetir u
+ * omitir filas.
  */
-export async function getByVecino(vecinoId: number): Promise<SolicitudFrontend[]> {
-  const [rows] = await pool.execute<FilaSolicitud[]>(
-    `${BASE_SELECT} WHERE s.vecino_id = ? ORDER BY s.creada_en DESC`,
-    [vecinoId]
+const ORDEN_LISTADO = 'ORDER BY s.creada_en DESC, s.id DESC';
+
+/**
+ * Devuelve una página de solicitudes y el total que cumple el filtro.
+ *
+ * El total se cuenta sobre `solicitud` sola (sin el JOIN con usuario, que no
+ * cambia el número de filas) para que use los índices de estado y vecino.
+ *
+ * @param where Condición sobre el alias `s`, o cadena vacía para no filtrar.
+ * @param valores Valores de los marcadores de `where`.
+ */
+async function listarPagina(
+  where: string,
+  valores: (string | number)[],
+  pagination: PaginationParams
+): Promise<PaginatedResult<SolicitudFrontend>> {
+  const [totales] = await pool.execute<FilaTotal[]>(
+    `SELECT COUNT(*) AS total FROM solicitud s ${where}`,
+    valores
   );
-  return rows.map(toFrontend);
+  const total = Number(totales[0].total);
+
+  const [rows] = await pool.execute<FilaSolicitud[]>(
+    `${BASE_SELECT} ${where} ${ORDEN_LISTADO} LIMIT ? OFFSET ?`,
+    [...valores, ...limitOffset(pagination)]
+  );
+
+  return {
+    items: rows.map(toFrontend),
+    pagination: buildPaginationMeta(pagination.page, pagination.limit, total),
+  };
 }
 
 /**
- * Lista todas las solicitudes del sistema, opcionalmente filtradas por estado.
- * Es la vista del funcionario.
+ * Lista una página de las solicitudes de un vecino, de la más reciente a la
+ * más antigua.
+ *
+ * @param vecinoId Id del vecino dueño de las solicitudes.
+ * @param pagination Página pedida. Por defecto, la primera.
+ */
+export async function getByVecino(
+  vecinoId: number,
+  pagination: PaginationParams = PRIMERA_PAGINA
+): Promise<PaginatedResult<SolicitudFrontend>> {
+  return listarPagina('WHERE s.vecino_id = ?', [vecinoId], pagination);
+}
+
+/**
+ * Lista una página de todas las solicitudes del sistema, opcionalmente
+ * filtradas por estado. Es la vista del funcionario.
  *
  * @param estado Estado por el que filtrar. Si se omite, devuelve todas.
+ * @param pagination Página pedida. Por defecto, la primera.
  */
-export async function getAll(estado?: EstadoSolicitud): Promise<SolicitudFrontend[]> {
-  if (estado !== undefined) {
-    const [rows] = await pool.execute<FilaSolicitud[]>(
-      `${BASE_SELECT} WHERE s.estado = ? ORDER BY s.creada_en DESC`,
-      [estado]
-    );
-    return rows.map(toFrontend);
-  }
-
-  const [rows] = await pool.execute<FilaSolicitud[]>(`${BASE_SELECT} ORDER BY s.creada_en DESC`);
-  return rows.map(toFrontend);
+export async function getAll(
+  estado?: EstadoSolicitud,
+  pagination: PaginationParams = PRIMERA_PAGINA
+): Promise<PaginatedResult<SolicitudFrontend>> {
+  return estado !== undefined
+    ? listarPagina('WHERE s.estado = ?', [estado], pagination)
+    : listarPagina('', [], pagination);
 }
 
 /**
@@ -183,6 +233,35 @@ const AVISO_POR_ESTADO: Record<Exclude<EstadoSolicitud, 'pendiente'>, { titulo: 
 };
 
 /**
+ * Envía al vecino el correo de cambio de estado. Se llama SIN await después del
+ * commit: la respuesta HTTP no espera al proveedor de correo y, como el cambio
+ * ya quedó guardado, un fallo aquí (incluida la búsqueda del vecino) solo se
+ * registra en el log. Por eso atrapa todo y nunca rechaza.
+ */
+async function avisarPorEmail(
+  vecinoId: number,
+  folio: string,
+  nombreTramite: string,
+  estado: Exclude<EstadoSolicitud, 'pendiente'>,
+  observaciones?: string
+): Promise<void> {
+  try {
+    const vecino = await userService.findById(vecinoId);
+    if (!vecino) return;
+    await emailService.enviarNotificacionEstado({
+      destinatario: vecino.email,
+      nombreVecino: vecino.nombre,
+      folio,
+      nombreTramite,
+      estado,
+      observaciones,
+    });
+  } catch (err) {
+    console.error(`❌ No se pudo avisar por email el cambio de ${folio}:`, err instanceof Error ? err.message : err);
+  }
+}
+
+/**
  * Cambia el estado de una solicitud, registra qué funcionario la resolvió y
  * avisa al vecino dueño.
  *
@@ -193,6 +272,11 @@ const AVISO_POR_ESTADO: Record<Exclude<EstadoSolicitud, 'pendiente'>, { titulo: 
  * el vecino. El bloqueo es solo sobre la fila de `solicitud`: el nombre del
  * trámite se lee aparte, sin bloqueo. Si algo falla, no queda un cambio
  * de estado sin su aviso.
+ *
+ * Además del aviso dentro de la app, después del commit se envía un correo al
+ * vecino (ver `avisarPorEmail`). Va fuera de la transacción a propósito: si el
+ * proveedor de correo falla o demora, el cambio de estado no se revierte ni se
+ * retrasa.
  *
  * `resuelta_en` solo se completa cuando el trámite llega a un estado final
  * (aprobado o rechazado). Si no se envían observaciones, se conservan las que
@@ -250,7 +334,8 @@ export async function updateEstado(
     );
 
     // 'pendiente' no es un destino válido (ver TRANSICIONES), así que siempre hay aviso.
-    const aviso = AVISO_POR_ESTADO[estado as Exclude<EstadoSolicitud, 'pendiente'>];
+    const estadoNuevo = estado as Exclude<EstadoSolicitud, 'pendiente'>;
+    const aviso = AVISO_POR_ESTADO[estadoNuevo];
     const comentario = observaciones?.trim() ? ` Observaciones: ${observaciones.trim()}` : '';
     await notificacionService.create(
       actual.vecino_id,
@@ -262,6 +347,10 @@ export async function updateEstado(
 
     const [rows] = await conn.execute<FilaSolicitud[]>(`${BASE_SELECT} WHERE s.id = ?`, [actual.id]);
     await conn.commit();
+
+    // Sin await: el correo no forma parte de la respuesta (ver avisarPorEmail).
+    void avisarPorEmail(actual.vecino_id, folio, tramites[0].nombre, estadoNuevo, observaciones?.trim() || undefined);
+
     return { tipo: 'actualizada', solicitud: toFrontend(rows[0]) };
   } catch (err) {
     // Si el rollback también falla (conexión caída) se conserva el error original.

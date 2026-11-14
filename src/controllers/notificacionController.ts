@@ -1,9 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import * as notificacionService from '../services/notificacionService';
+import { parsePagination } from '../utils/pagination';
 
 /**
  * GET /api/notificaciones
- * Devuelve las notificaciones del usuario autenticado.
+ * Devuelve las notificaciones del usuario autenticado, paginadas con ?page=
+ * (por defecto 1) y ?limit= (por defecto 20, máximo 100).
+ * `pagination.unread` cuenta las no leídas de todas las páginas.
  */
 export const listarNotificaciones = async (
   req: Request,
@@ -12,8 +15,12 @@ export const listarNotificaciones = async (
 ): Promise<void> => {
   try {
     const userId = req.user!.id;
-    const notificaciones = await notificacionService.getByUsuario(userId);
-    res.status(200).json({ success: true, data: notificaciones });
+    const pagina = await notificacionService.getByUsuario(userId, parsePagination(req.query));
+    res.status(200).json({
+      success: true,
+      data: pagina.items,
+      pagination: { ...pagina.pagination, unread: pagina.noLeidas },
+    });
   } catch (err) {
     next(err);
   }
