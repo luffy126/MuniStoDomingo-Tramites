@@ -14,8 +14,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (data: RegisterData) => Promise<User>;
   actualizarPerfil: (data: PerfilData) => Promise<void>;
   logout: () => void;
 }
@@ -46,16 +46,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<User> => {
     const signedInUser = await loginRequest(email, password);
     setUser(signedInUser);
-    return true;
+    return signedInUser;
   }, []);
 
-  const register = useCallback(async (data: RegisterData): Promise<boolean> => {
+  const register = useCallback(async (data: RegisterData): Promise<User> => {
     const createdUser = await registerRequest(data);
     setUser(createdUser);
-    return true;
+    return createdUser;
   }, []);
 
   const actualizarPerfil = useCallback(async (data: PerfilData): Promise<void> => {

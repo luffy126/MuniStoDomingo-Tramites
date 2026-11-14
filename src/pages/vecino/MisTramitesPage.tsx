@@ -1,5 +1,6 @@
+import { TemaBoton } from '../../components/common/TemaToggle';
 import { useCallback, useState } from 'react';
-import {
+import { IonButtons,
   IonBadge,
   IonButton,
   IonContent,
@@ -24,36 +25,39 @@ import {
   ETIQUETA_ESTADO,
   cancelarSolicitud,
   getTramites,
-  getSolicitudes,
+  getSolicitudesPagina,
 } from '../../services/tramiteService';
-import type { Solicitud, Tramite } from '../../services/tramiteService';
+import type { Tramite } from '../../services/tramiteService';
+import { useListaPaginada } from '../../hooks/useListaPaginada';
+import PieListaPaginada from '../../components/common/PieListaPaginada';
 
 const MisTramitesPage: React.FC = () => {
-  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [tramites, setTramites] = useState<Tramite[]>([]);
-  const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
   const [tipoMensaje, setTipoMensaje] = useState<'success' | 'danger'>('danger');
   const [cancelando, setCancelando] = useState<string | null>(null);
   const [presentarAlerta] = useIonAlert();
 
-  const cargar = useCallback((): void => {
-    setCargando(true);
-    void Promise.all([getSolicitudes(), getTramites()])
-      .then(([items, catalogo]) => { setSolicitudes(items); setTramites(catalogo); })
-      .catch((error: unknown) => { setTipoMensaje('danger'); setMensaje(error instanceof Error ? error.message : 'No se pudieron cargar tus trámites.'); })
-      .finally(() => setCargando(false));
-  }, []);
-
+  const cargarPagina = useCallback((page: number) => getSolicitudesPagina(page), []);
+  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, cargarMas } = useListaPaginada(cargarPagina);
   useCargarAlEntrar('/vecino/mis-tramites', cargar);
+
+  // El catálogo se pide aparte: no depende de la página de solicitudes.
+  const cargarCatalogo = useCallback((): void => {
+    void getTramites()
+      .then(setTramites)
+      .catch((e: unknown) => { setTipoMensaje('danger'); setMensaje(e instanceof Error ? e.message : 'No se pudo cargar el catálogo de trámites.'); });
+  }, []);
+  useCargarAlEntrar('/vecino/mis-tramites', cargarCatalogo);
 
   const cancelar = async (folio: string): Promise<void> => {
     setCancelando(folio);
     try {
       await cancelarSolicitud(folio);
-      setSolicitudes((actuales) => actuales.filter((solicitud) => solicitud.id !== folio));
       setTipoMensaje('success');
       setMensaje(`Solicitud ${folio} cancelada.`);
+      // Se recarga desde la página 1: quitarla a mano correría el resto y la siguiente página omitiría una solicitud.
+      cargar();
     } catch (error) {
       setTipoMensaje('danger');
       setMensaje(error instanceof Error ? error.message : 'No se pudo cancelar la solicitud.');
@@ -81,11 +85,16 @@ const MisTramitesPage: React.FC = () => {
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>Mis trámites</IonTitle>
-        </IonToolbar>
+        <IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar>
       </IonHeader>
       <IonContent>
         <div className="contenedor-pagina">
-          {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando tus trámites…</p></div> : solicitudes.length === 0 ? (
+          {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando tus trámites…</p></div> : error !== '' && solicitudes.length === 0 ? (
+            <div className="estado-vacio">
+              <IonText color="danger"><p>{error}</p></IonText>
+              <IonButton fill="outline" onClick={cargar}>Reintentar</IonButton>
+            </div>
+          ) : solicitudes.length === 0 ? (
             <div className="estado-vacio">
               <IonIcon icon={fileTrayOutline} color="medium" />
               <IonText color="medium">
@@ -93,6 +102,7 @@ const MisTramitesPage: React.FC = () => {
               </IonText>
             </div>
           ) : (
+            <>
             <IonList inset>
               {solicitudes.map((solicitud) => (
                 <IonItem key={solicitud.id} lines="full">
@@ -116,9 +126,11 @@ const MisTramitesPage: React.FC = () => {
                 </IonItem>
               ))}
             </IonList>
+            <PieListaPaginada pagination={pagination} cargados={solicitudes.length} cargandoMas={cargandoMas} onCargarMas={cargarMas} />
+            </>
           )}
         </div>
-        <IonToast isOpen={mensaje !== ''} message={mensaje} duration={3500} color={tipoMensaje} onDidDismiss={() => setMensaje('')} />
+        <IonToast isOpen={mensaje !== '' || error !== ''} message={mensaje || error} duration={3500} color={mensaje !== '' ? tipoMensaje : 'danger'} onDidDismiss={() => { setMensaje(''); limpiarError(); }} />
       </IonContent>
     </IonPage>
   );

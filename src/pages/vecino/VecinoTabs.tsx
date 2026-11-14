@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { IonIcon, IonLabel, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs } from '@ionic/react';
 import { documentsOutline, gridOutline, notificationsOutline, personCircleOutline } from 'ionicons/icons';
 import DashboardPage from './DashboardPage';
@@ -6,6 +6,7 @@ import TramiteDetailPage from './TramiteDetailPage';
 import MisTramitesPage from './MisTramitesPage';
 import NotificacionesPage from './NotificacionesPage';
 import PerfilPage from './PerfilPage';
+import Redireccion from '../../routes/Redireccion';
 
 const VecinoTabs: React.FC = () => (
   <IonTabs>
@@ -16,7 +17,7 @@ const VecinoTabs: React.FC = () => (
         <Route path="/vecino/mis-tramites" element={<MisTramitesPage />} />
         <Route path="/vecino/notificaciones" element={<NotificacionesPage />} />
         <Route path="/vecino/perfil" element={<PerfilPage />} />
-        <Route path="/vecino/*" element={<Navigate to="/vecino/dashboard" replace />} />
+        <Route path="/vecino/*" element={<Redireccion a="/vecino/dashboard" />} />
       </Routes>
     </IonRouterOutlet>
 

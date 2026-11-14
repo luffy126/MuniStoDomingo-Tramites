@@ -1,4 +1,5 @@
 import apiClient, { ApiError } from './apiClient';
+import type { Pagina } from './apiClient';
 
 export type CategoriaTramite = 'certificados' | 'permisos' | 'reclamos' | 'solicitudes';
 export type EstadoSolicitud = 'pendiente' | 'en_revision' | 'aprobado' | 'rechazado';
@@ -119,7 +120,14 @@ export const getTramiteById = async (id: string): Promise<Tramite | undefined> =
 
 export const getSolicitudes = async (estado?: EstadoSolicitud): Promise<Solicitud[]> => {
   const query = estado ? `?estado=${encodeURIComponent(estado)}` : '';
-  return (await apiClient.get<BackendSolicitud[]>(`/api/solicitudes${query}`)).map(adaptarSolicitud);
+  return (await apiClient.getTodos<BackendSolicitud>(`/api/solicitudes${query}`)).map(adaptarSolicitud);
+};
+
+/** Una página de solicitudes; el filtro por estado lo aplica el servidor (solo funcionario). */
+export const getSolicitudesPagina = async (page: number, estado?: EstadoSolicitud): Promise<Pagina<Solicitud>> => {
+  const query = estado ? `?estado=${encodeURIComponent(estado)}` : '';
+  const { data, pagination } = await apiClient.getPagina<BackendSolicitud>(`/api/solicitudes${query}`, page);
+  return { data: data.map(adaptarSolicitud), pagination };
 };
 
 export const getSolicitudById = async (folio: string): Promise<Solicitud | undefined> => {
@@ -158,7 +166,13 @@ export const cancelarSolicitud = async (folio: string): Promise<void> => {
 };
 
 export const getNotificaciones = async (): Promise<Notificacion[]> =>
-  (await apiClient.get<BackendNotificacion[]>('/api/notificaciones')).map(adaptarNotificacion);
+  (await apiClient.getTodos<BackendNotificacion>('/api/notificaciones')).map(adaptarNotificacion);
+
+/** Una página de notificaciones; `pagination.unread` trae el total de no leídas. */
+export const getNotificacionesPagina = async (page: number): Promise<Pagina<Notificacion>> => {
+  const { data, pagination } = await apiClient.getPagina<BackendNotificacion>('/api/notificaciones', page);
+  return { data: data.map(adaptarNotificacion), pagination };
+};
 
 export const marcarNotificacionLeida = async (id: string): Promise<Notificacion> =>
   adaptarNotificacion(await apiClient.patch<BackendNotificacion>(`/api/notificaciones/${encodeURIComponent(id)}`));

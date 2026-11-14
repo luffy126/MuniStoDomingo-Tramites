@@ -1,4 +1,4 @@
-import apiClient, { SESSION_KEY, TOKEN_KEY } from './apiClient';
+import apiClient, { ApiError, SESSION_KEY, TOKEN_KEY } from './apiClient';
 
 export type Rol = 'vecino' | 'funcionario';
 
@@ -97,8 +97,23 @@ export const recuperarSesion = async (): Promise<User | null> => {
     const user = adaptarUser(backendUser);
     storage?.setItem(SESSION_KEY, JSON.stringify(user));
     return user;
+  } catch (error) {
+    // Solo un 401/403 significa que el token ya no sirve. Un 429 (el backend limita
+    // las peticiones a /api/auth, incluido /me) o una caída momentánea no deben
+    // cerrar la sesión: se sigue con el usuario guardado y la próxima llamada
+    // protegida volverá a validar el token.
+    const tokenInvalido = error instanceof ApiError && (error.status === 401 || error.status === 403);
+    const guardado = tokenInvalido ? null : leerUsuarioGuardado(storage);
+    if (!guardado) limpiarSesion();
+    return guardado;
+  }
+};
+
+const leerUsuarioGuardado = (storage: Storage | null): User | null => {
+  try {
+    const user = JSON.parse(storage?.getItem(SESSION_KEY) ?? 'null') as User | null;
+    return user && user.id && user.email && (user.rol === 'vecino' || user.rol === 'funcionario') ? user : null;
   } catch {
-    limpiarSesion();
     return null;
   }
 };
