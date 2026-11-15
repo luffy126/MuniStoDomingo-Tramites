@@ -1,3 +1,4 @@
+import RecargarAlTirar from '../../components/common/RecargarAlTirar';
 import { TemaBoton } from '../../components/common/TemaToggle';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -28,7 +29,7 @@ const SolicitudesPage: React.FC = () => {
     (page: number) => getSolicitudesPagina(page, filtro === 'todos' ? undefined : filtro),
     [filtro],
   );
-  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, cargarMas } = useListaPaginada(cargarPagina);
+  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas } = useListaPaginada(cargarPagina);
   // Al cambiar el filtro cambia `cargarPagina`, y con él `cargar`: la lista se vuelve a pedir desde la página 1.
   useCargarAlEntrar('/funcionario/solicitudes', cargar);
 
@@ -45,6 +46,7 @@ const SolicitudesPage: React.FC = () => {
     <IonPage>
       <IonHeader><IonToolbar color="primary"><IonButtons slot="start"><IonMenuButton /></IonButtons><IonTitle>Solicitudes</IonTitle><IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar><IonToolbar><IonSegment scrollable value={filtro} onIonChange={(event) => setFiltro(esFiltroEstado(event.detail.value) ? event.detail.value : 'todos')}>{FILTROS.map((estado) => <IonSegmentButton key={estado} value={estado}><IonLabel>{estado === 'todos' ? 'Todas' : ETIQUETA_ESTADO[estado]}</IonLabel></IonSegmentButton>)}</IonSegment></IonToolbar></IonHeader>
       <IonContent>
+        <RecargarAlTirar onRecargar={recargar} />
         <div className="contenedor-pagina">
           {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando solicitudes…</p></div> : error !== '' && solicitudes.length === 0 ? <div className="estado-vacio"><IonText color="danger"><p>{error}</p></IonText><IonButton fill="outline" onClick={cargar}>Reintentar</IonButton></div> : solicitudes.length === 0 ? <div className="estado-vacio"><IonIcon icon={fileTrayOutline} color="medium" /><IonText color="medium"><p>No hay solicitudes en este estado.</p></IonText></div> : <><IonList inset>{solicitudes.map((solicitud) => <IonItem key={solicitud.id} button lines="full" onClick={() => navigate(`/funcionario/solicitud/${encodeURIComponent(solicitud.id)}`)}><IonLabel className="ion-text-wrap"><h2>{tramites.find((tramite) => tramite.id === solicitud.tramiteId)?.nombre ?? 'Trámite municipal'}</h2><p>{solicitud.vecinoNombre} · Folio {solicitud.id}</p><p>Ingresado el {solicitud.fecha}</p></IonLabel><IonBadge color={COLOR_ESTADO[solicitud.estado]} slot="end">{ETIQUETA_ESTADO[solicitud.estado]}</IonBadge></IonItem>)}</IonList><PieListaPaginada pagination={pagination} cargados={solicitudes.length} cargandoMas={cargandoMas} onCargarMas={cargarMas} /></>}
         </div>

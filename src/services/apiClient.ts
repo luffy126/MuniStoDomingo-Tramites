@@ -1,7 +1,29 @@
+import storageService from './storageService';
+
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 export const TOKEN_KEY = 'munisd.token';
 export const SESSION_KEY = 'munisd.sesion';
 export const UNAUTHORIZED_EVENT = 'munisd:unauthorized';
+
+/**
+ * Copia del token en memoria. localStorage manda (refleja un login o logout hecho
+ * en otra pestaña), pero si el navegador lo bloquea (modo privado, WebView
+ * restringido) el token restaurado desde IndexedDB queda aquí y las peticiones
+ * siguen autenticadas.
+ */
+let tokenEnMemoria: string | null = null;
+
+export const recordarToken = (token: string | null): void => {
+  tokenEnMemoria = token;
+};
+
+const leerToken = (): string | null => {
+  try {
+    return window.localStorage.getItem(TOKEN_KEY) ?? tokenEnMemoria;
+  } catch {
+    return tokenEnMemoria;
+  }
+};
 
 /** Metadatos que el backend agrega a los listados paginados. */
 export interface Paginacion {
@@ -59,12 +81,8 @@ const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<Ap
     headers.set('Content-Type', 'application/json');
   }
 
-  try {
-    const token = window.localStorage.getItem(TOKEN_KEY);
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-  } catch {
-    // El navegador puede bloquear localStorage; las rutas públicas siguen disponibles.
-  }
+  const token = leerToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
   let response: Response;
   const controlador = new AbortController();
@@ -98,6 +116,10 @@ const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<Ap
     } catch {
       // Ignorar si el almacenamiento no está disponible.
     }
+    // También el respaldo: si no, la próxima apertura restauraría un token vencido.
+    tokenEnMemoria = null;
+    void storageService.remove(TOKEN_KEY);
+    void storageService.remove(SESSION_KEY);
     window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
   }
 

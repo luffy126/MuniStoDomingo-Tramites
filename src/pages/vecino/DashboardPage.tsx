@@ -1,5 +1,6 @@
+import RecargarAlTirar from '../../components/common/RecargarAlTirar';
 import { TemaBoton } from '../../components/common/TemaToggle';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IonButtons,
   IonChip,
@@ -29,16 +30,25 @@ const DashboardPage: React.FC = () => {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
+  const montada = useRef(true);
   useEffect(() => {
-    let cancelled = false;
-    void getTramites()
-      .then((items) => { if (!cancelled) setTramites(items); })
-      .catch((error: unknown) => {
-        if (!cancelled) setMensaje(error instanceof Error ? error.message : 'No se pudo cargar el catálogo.');
-      })
-      .finally(() => { if (!cancelled) setCargando(false); });
-    return () => { cancelled = true; };
+    montada.current = true; // StrictMode desmonta y vuelve a montar en desarrollo
+    return () => { montada.current = false; };
   }, []);
+
+  /** Pide el catálogo. Al recargar se conserva el que había si la petición falla. */
+  const cargarTramites = useCallback(async (): Promise<void> => {
+    try {
+      const items = await getTramites();
+      if (montada.current) setTramites(items);
+    } catch (error: unknown) {
+      if (montada.current) setMensaje(error instanceof Error ? error.message : 'No se pudo cargar el catálogo.');
+    } finally {
+      if (montada.current) setCargando(false);
+    }
+  }, []);
+
+  useEffect(() => { void cargarTramites(); }, [cargarTramites]);
 
   const visibles = useMemo(() => {
     const query = busqueda.trim().toLowerCase();
@@ -59,6 +69,7 @@ const DashboardPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent>
+        <RecargarAlTirar onRecargar={cargarTramites} />
         <div className="contenedor-pagina">
           <IonText><h2>Hola, {user?.nombre ?? 'vecino'}</h2><p>Selecciona un trámite para conocer los requisitos e iniciar tu solicitud.</p></IonText>
           <div className="fila-chips">

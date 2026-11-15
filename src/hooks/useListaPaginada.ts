@@ -6,7 +6,9 @@ import { unirPaginas } from '../utils/paginacion';
  * Estado de un listado paginado con "Cargar más".
  *
  * `cargar()` trae la página 1 (reemplaza lo que hubiera) y `cargarMas()` agrega la
- * siguiente mientras `pagination.hasNext`. Una respuesta que llega tarde, después de
+ * siguiente mientras `pagination.hasNext`. `recargar()` hace lo mismo que `cargar()`
+ * pero sin el spinner de pantalla completa (la lista sigue visible mientras tanto)
+ * y devuelve una promesa, para el gesto de tirar hacia abajo. Una respuesta que llega tarde, después de
  * volver a llamar `cargar()` (p. ej. al cambiar de filtro), se descarta para que no
  * mezcle datos de dos consultas.
  *
@@ -20,12 +22,12 @@ export const useListaPaginada = <T extends { id: string }>(cargarPagina: (page: 
   const [error, setError] = useState('');
   const consulta = useRef(0);
 
-  const cargar = useCallback((): void => {
+  const pedirPrimera = useCallback((conSpinner: boolean): Promise<void> => {
     const mia = ++consulta.current;
-    setCargando(true);
+    if (conSpinner) setCargando(true);
     setCargandoMas(false);
     setError('');
-    cargarPagina(1)
+    return cargarPagina(1)
       .then((pagina) => {
         if (mia !== consulta.current) return;
         setItems(pagina.data);
@@ -38,6 +40,9 @@ export const useListaPaginada = <T extends { id: string }>(cargarPagina: (page: 
         if (mia === consulta.current) setCargando(false);
       });
   }, [cargarPagina]);
+
+  const cargar = useCallback((): void => { void pedirPrimera(true); }, [pedirPrimera]);
+  const recargar = useCallback((): Promise<void> => pedirPrimera(false), [pedirPrimera]);
 
   const cargarMas = useCallback((): void => {
     if (!pagination?.hasNext || cargando || cargandoMas) return;
@@ -61,7 +66,7 @@ export const useListaPaginada = <T extends { id: string }>(cargarPagina: (page: 
 
   return {
     items, setItems, pagination, setPagination,
-    cargando, cargandoMas, error, limpiarError, cargar, cargarMas,
+    cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas,
   };
 };
 
