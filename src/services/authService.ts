@@ -1,4 +1,5 @@
-import apiClient, { ApiError, SESSION_KEY, TOKEN_KEY } from './apiClient';
+import apiClient, { actualizarTokenEnMemoria, ApiError, SESSION_KEY, TOKEN_KEY } from './apiClient';
+import storageService from './storageService';
 
 export type Rol = 'vecino' | 'funcionario';
 
@@ -41,18 +42,59 @@ const getStorage = (): Storage | null => {
   }
 };
 
+const leerDatoLocal = (key: string): string | null => {
+  try {
+    return getStorage()?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const guardarDatoLocal = (key: string, value: string): void => {
+  try {
+    getStorage()?.setItem(key, value);
+  } catch {
+    // IndexedDB queda como respaldo cuando el navegador bloquea localStorage.
+  }
+};
+
+const quitarDatoLocal = (key: string): void => {
+  try {
+    getStorage()?.removeItem(key);
+  } catch {
+    // IndexedDB también se limpia abajo.
+  }
+};
+
+const guardarDatoRespaldo = (key: string, value: string): void => {
+  void storageService.set(key, value).catch(() => {
+    // La aplicación sigue funcionando con localStorage si IndexedDB no está disponible.
+  });
+};
+
+const quitarDatoRespaldo = (key: string): void => {
+  void storageService.remove(key).catch(() => {
+    // El navegador puede no ofrecer almacenamiento persistente.
+  });
+};
+
 const adaptarUser = (user: BackendUser): User => ({ ...user, id: String(user.id) });
 
 export const guardarSesion = (user: User, token: string): void => {
-  const storage = getStorage();
-  storage?.setItem(SESSION_KEY, JSON.stringify(user));
-  storage?.setItem(TOKEN_KEY, token);
+  actualizarTokenEnMemoria(token);
+  const sesion = JSON.stringify(user);
+  guardarDatoLocal(SESSION_KEY, sesion);
+  guardarDatoLocal(TOKEN_KEY, token);
+  guardarDatoRespaldo(SESSION_KEY, sesion);
+  guardarDatoRespaldo(TOKEN_KEY, token);
 };
 
 export const limpiarSesion = (): void => {
-  const storage = getStorage();
-  storage?.removeItem(SESSION_KEY);
-  storage?.removeItem(TOKEN_KEY);
+  actualizarTokenEnMemoria(null);
+  quitarDatoLocal(SESSION_KEY);
+  quitarDatoLocal(TOKEN_KEY);
+  quitarDatoRespaldo(SESSION_KEY);
+  quitarDatoRespaldo(TOKEN_KEY);
 };
 
 export const loginRequest = async (email: string, password: string): Promise<User> => {
@@ -86,16 +128,28 @@ export const actualizarPerfilRequest = async (data: PerfilData): Promise<User> =
 
 export const recuperarSesion = async (): Promise<User | null> => {
   const storage = getStorage();
-  const token = storage?.getItem(TOKEN_KEY);
+  let token = leerDatoLocal(TOKEN_KEY);
+  if (!token) {
+    try {
+      token = await storageService.get<string>(TOKEN_KEY);
+    } catch {
+      token = null;
+    }
+  }
+
   if (!token) {
     limpiarSesion();
     return null;
   }
 
+  // El cliente HTTP necesita una fuente síncrona mientras valida /me.
+  actualizarTokenEnMemoria(token);
+  guardarDatoLocal(TOKEN_KEY, token);
+
   try {
     const backendUser = await apiClient.get<BackendUser>('/api/auth/me');
     const user = adaptarUser(backendUser);
-    storage?.setItem(SESSION_KEY, JSON.stringify(user));
+    guardarSesion(user, token);
     return user;
   } catch (error) {
     // Solo un 401/403 significa que el token ya no sirve. Un 429 (el backend limita
@@ -103,9 +157,19 @@ export const recuperarSesion = async (): Promise<User | null> => {
     // cerrar la sesión: se sigue con el usuario guardado y la próxima llamada
     // protegida volverá a validar el token.
     const tokenInvalido = error instanceof ApiError && (error.status === 401 || error.status === 403);
-    const guardado = tokenInvalido ? null : leerUsuarioGuardado(storage);
+    const guardado = tokenInvalido ? null : leerUsuarioGuardado(storage) ?? await leerUsuarioRespaldo();
     if (!guardado) limpiarSesion();
     return guardado;
+  }
+};
+
+const leerUsuarioRespaldo = async (): Promise<User | null> => {
+  try {
+    const raw = await storageService.get<string>(SESSION_KEY);
+    const user = JSON.parse(raw ?? 'null') as User | null;
+    return user && user.id && user.email && (user.rol === 'vecino' || user.rol === 'funcionario') ? user : null;
+  } catch {
+    return null;
   }
 };
 

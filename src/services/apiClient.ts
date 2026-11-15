@@ -3,6 +3,13 @@ export const TOKEN_KEY = 'munisd.token';
 export const SESSION_KEY = 'munisd.sesion';
 export const UNAUTHORIZED_EVENT = 'munisd:unauthorized';
 
+let tokenEnMemoria: string | null = null;
+
+/** Mantiene disponible el token restaurado aunque el navegador bloquee localStorage. */
+export const actualizarTokenEnMemoria = (token: string | null): void => {
+  tokenEnMemoria = token;
+};
+
 /** Metadatos que el backend agrega a los listados paginados. */
 export interface Paginacion {
   page: number;
@@ -60,9 +67,10 @@ const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<Ap
   }
 
   try {
-    const token = window.localStorage.getItem(TOKEN_KEY);
+    const token = window.localStorage.getItem(TOKEN_KEY) || tokenEnMemoria;
     if (token) headers.set('Authorization', `Bearer ${token}`);
   } catch {
+    if (tokenEnMemoria) headers.set('Authorization', `Bearer ${tokenEnMemoria}`);
     // El navegador puede bloquear localStorage; las rutas públicas siguen disponibles.
   }
 
@@ -92,6 +100,7 @@ const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<Ap
   }
 
   if (response.status === 401) {
+    actualizarTokenEnMemoria(null);
     try {
       window.localStorage.removeItem(TOKEN_KEY);
       window.localStorage.removeItem(SESSION_KEY);
