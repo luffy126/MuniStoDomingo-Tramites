@@ -1,11 +1,13 @@
 import { TemaBoton } from '../../components/common/TemaToggle';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IonButtons,
   IonChip,
   IonContent,
   IonHeader,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSearchbar,
   IonSpinner,
   IonText,
@@ -29,16 +31,19 @@ const DashboardPage: React.FC = () => {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-    void getTramites()
-      .then((items) => { if (!cancelled) setTramites(items); })
-      .catch((error: unknown) => {
-        if (!cancelled) setMensaje(error instanceof Error ? error.message : 'No se pudo cargar el catálogo.');
-      })
-      .finally(() => { if (!cancelled) setCargando(false); });
-    return () => { cancelled = true; };
+  const cargarTramites = useCallback(async (): Promise<void> => {
+    setCargando(true);
+    setMensaje('');
+    try {
+      setTramites(await getTramites());
+    } catch (error: unknown) {
+      setMensaje(error instanceof Error ? error.message : 'No se pudo cargar el catálogo.');
+    } finally {
+      setCargando(false);
+    }
   }, []);
+
+  useEffect(() => { void cargarTramites(); }, [cargarTramites]);
 
   const visibles = useMemo(() => {
     const query = busqueda.trim().toLowerCase();
@@ -59,6 +64,15 @@ const DashboardPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent>
+        <IonRefresher slot="fixed" onIonRefresh={async (event) => {
+          try {
+            await cargarTramites();
+          } finally {
+            event.detail.complete();
+          }
+        }}>
+          <IonRefresherContent />
+        </IonRefresher>
         <div className="contenedor-pagina">
           <IonText><h2>Hola, {user?.nombre ?? 'vecino'}</h2><p>Selecciona un trámite para conocer los requisitos e iniciar tu solicitud.</p></IonText>
           <div className="fila-chips">

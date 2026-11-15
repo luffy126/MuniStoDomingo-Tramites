@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { IonButtons,
   IonBadge, IonButton, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList,
   IonPage, IonSpinner, IonText, IonTitle, IonToast, IonToolbar,
+  IonRefresher, IonRefresherContent,
 } from '@ionic/react';
 import { mailOpenOutline, mailUnreadOutline } from 'ionicons/icons';
 import { getNotificacionesPagina, marcarNotificacionLeida } from '../../services/tramiteService';
@@ -37,6 +38,15 @@ const NotificacionesPage: React.FC = () => {
     <IonPage>
       <IonHeader><IonToolbar color="primary"><IonTitle>Notificaciones</IonTitle>{sinLeer > 0 ? <IonBadge color="danger" slot="end" className="ion-margin-end">{sinLeer}</IonBadge> : null}<IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar></IonHeader>
       <IonContent>
+        <IonRefresher slot="fixed" onIonRefresh={async (event) => {
+          try {
+            await cargar();
+          } finally {
+            event.detail.complete();
+          }
+        }}>
+          <IonRefresherContent />
+        </IonRefresher>
         <div className="contenedor-pagina">
           {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando notificaciones…</p></div> : error !== '' && notificaciones.length === 0 ? <div className="estado-vacio"><IonText color="danger"><p>{error}</p></IonText><IonButton fill="outline" onClick={cargar}>Reintentar</IonButton></div> : notificaciones.length === 0 ? <div className="estado-vacio"><IonIcon icon={mailOpenOutline} color="medium" /><IonText color="medium"><p>No tienes notificaciones.</p></IonText></div> : <><IonList inset>{notificaciones.map((notification) => <IonItem key={notification.id} button={!notification.leida} lines="full" onClick={() => void marcarLeida(notification)}><IonIcon icon={notification.leida ? mailOpenOutline : mailUnreadOutline} color={notification.leida ? 'medium' : 'primary'} slot="start" /><IonLabel className="ion-text-wrap"><h2>{notification.titulo}</h2><p>{notification.mensaje}</p><p>{notification.fecha}</p></IonLabel></IonItem>)}</IonList><PieListaPaginada pagination={pagination} cargados={notificaciones.length} cargandoMas={cargandoMas} onCargarMas={cargarMas} /></>}
         </div>

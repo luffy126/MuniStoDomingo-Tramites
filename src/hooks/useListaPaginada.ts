@@ -20,12 +20,13 @@ export const useListaPaginada = <T extends { id: string }>(cargarPagina: (page: 
   const [error, setError] = useState('');
   const consulta = useRef(0);
 
-  const cargar = useCallback((): void => {
+  const cargar = useCallback((): Promise<void> => {
     const mia = ++consulta.current;
     setCargando(true);
     setCargandoMas(false);
     setError('');
-    cargarPagina(1)
+    return Promise.resolve()
+      .then(() => cargarPagina(1))
       .then((pagina) => {
         if (mia !== consulta.current) return;
         setItems(pagina.data);

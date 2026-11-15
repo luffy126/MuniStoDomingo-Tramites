@@ -11,6 +11,8 @@ import { IonButtons,
   IonList,
   IonNote,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonSpinner,
   IonText,
   IonToast,
@@ -43,12 +45,19 @@ const MisTramitesPage: React.FC = () => {
   useCargarAlEntrar('/vecino/mis-tramites', cargar);
 
   // El catálogo se pide aparte: no depende de la página de solicitudes.
-  const cargarCatalogo = useCallback((): void => {
-    void getTramites()
-      .then(setTramites)
-      .catch((e: unknown) => { setTipoMensaje('danger'); setMensaje(e instanceof Error ? e.message : 'No se pudo cargar el catálogo de trámites.'); });
+  const cargarCatalogo = useCallback(async (): Promise<void> => {
+    try {
+      setTramites(await getTramites());
+    } catch (e: unknown) {
+      setTipoMensaje('danger');
+      setMensaje(e instanceof Error ? e.message : 'No se pudo cargar el catálogo de trámites.');
+    }
   }, []);
   useCargarAlEntrar('/vecino/mis-tramites', cargarCatalogo);
+
+  const refrescar = async (): Promise<void> => {
+    await Promise.all([cargar(), cargarCatalogo()]);
+  };
 
   const cancelar = async (folio: string): Promise<void> => {
     setCancelando(folio);
@@ -88,6 +97,15 @@ const MisTramitesPage: React.FC = () => {
         <IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar>
       </IonHeader>
       <IonContent>
+        <IonRefresher slot="fixed" onIonRefresh={async (event) => {
+          try {
+            await refrescar();
+          } finally {
+            event.detail.complete();
+          }
+        }}>
+          <IonRefresherContent />
+        </IonRefresher>
         <div className="contenedor-pagina">
           {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando tus trámites…</p></div> : error !== '' && solicitudes.length === 0 ? (
             <div className="estado-vacio">
