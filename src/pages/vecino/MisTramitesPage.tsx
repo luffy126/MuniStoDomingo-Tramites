@@ -1,3 +1,4 @@
+import RecargarAlTirar from '../../components/common/RecargarAlTirar';
 import { TemaBoton } from '../../components/common/TemaToggle';
 import { useCallback, useState } from 'react';
 import { IonButtons,
@@ -39,7 +40,7 @@ const MisTramitesPage: React.FC = () => {
   const [presentarAlerta] = useIonAlert();
 
   const cargarPagina = useCallback((page: number) => getSolicitudesPagina(page), []);
-  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, cargarMas } = useListaPaginada(cargarPagina);
+  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas } = useListaPaginada(cargarPagina);
   useCargarAlEntrar('/vecino/mis-tramites', cargar);
 
   // El catálogo se pide aparte: no depende de la página de solicitudes.
@@ -88,6 +89,7 @@ const MisTramitesPage: React.FC = () => {
         <IonButtons slot="end"><TemaBoton /></IonButtons></IonToolbar>
       </IonHeader>
       <IonContent>
+        <RecargarAlTirar onRecargar={recargar} />
         <div className="contenedor-pagina">
           {cargando ? <div className="ion-text-center ion-padding"><IonSpinner /><p>Cargando tus trámites…</p></div> : error !== '' && solicitudes.length === 0 ? (
             <div className="estado-vacio">

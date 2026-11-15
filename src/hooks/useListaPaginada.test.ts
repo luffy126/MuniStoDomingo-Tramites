@@ -74,4 +74,29 @@ describe('useListaPaginada', () => {
 
     expect(result.current.items.map((i) => i.id)).toEqual(['nueva']);
   });
+
+  it('recargar vuelve a la página 1 sin ocultar la lista y conserva los datos si falla', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(pagina(['a', 'b'], 1, true))
+      .mockResolvedValueOnce(pagina(['c'], 2, false))
+      .mockResolvedValueOnce(pagina(['z', 'a'], 1, true))
+      .mockRejectedValueOnce(new Error('Sin conexión'));
+    const { result } = renderHook(() => useListaPaginada<Item>(fetcher));
+
+    act(() => result.current.cargar());
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    act(() => result.current.cargarMas());
+    await waitFor(() => expect(result.current.items).toHaveLength(3));
+
+    let promesa!: Promise<void>;
+    act(() => { promesa = result.current.recargar(); });
+    expect(result.current.cargando).toBe(false);
+    await act(() => promesa);
+    expect(result.current.items.map((i) => i.id)).toEqual(['z', 'a']);
+    expect(result.current.pagination?.page).toBe(1);
+
+    await act(() => result.current.recargar());
+    expect(result.current.error).toBe('Sin conexión');
+    expect(result.current.items.map((i) => i.id)).toEqual(['z', 'a']);
+  });
 });
