@@ -1,3 +1,5 @@
+import { useMatch } from 'react-router-dom';
+import { useRecargaAutomatica } from '../../hooks/useRecargaAutomatica';
 import RecargarAlTirar from '../../components/common/RecargarAlTirar';
 import { TemaBoton } from '../../components/common/TemaToggle';
 import { useCallback, useState } from 'react';
@@ -40,8 +42,10 @@ const MisTramitesPage: React.FC = () => {
   const [presentarAlerta] = useIonAlert();
 
   const cargarPagina = useCallback((page: number) => getSolicitudesPagina(page), []);
-  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas } = useListaPaginada(cargarPagina);
+  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas, actualizarEnSilencio } = useListaPaginada(cargarPagina);
   useCargarAlEntrar('/vecino/mis-tramites', cargar);
+  // Los cambios hechos por otros (p. ej. un funcionario que resuelve) aparecen sin recargar.
+  useRecargaAutomatica(useMatch('/vecino/mis-tramites') !== null, actualizarEnSilencio);
 
   // El catálogo se pide aparte: no depende de la página de solicitudes.
   const cargarCatalogo = useCallback((): void => {

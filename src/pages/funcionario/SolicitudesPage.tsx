@@ -1,7 +1,8 @@
+import { useRecargaAutomatica } from '../../hooks/useRecargaAutomatica';
 import RecargarAlTirar from '../../components/common/RecargarAlTirar';
 import { TemaBoton } from '../../components/common/TemaToggle';
 import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useMatch } from 'react-router-dom';
 import {
   IonBadge, IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel,
   IonList, IonMenuButton, IonPage, IonSegment, IonSegmentButton, IonSpinner,
@@ -29,9 +30,11 @@ const SolicitudesPage: React.FC = () => {
     (page: number) => getSolicitudesPagina(page, filtro === 'todos' ? undefined : filtro),
     [filtro],
   );
-  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas } = useListaPaginada(cargarPagina);
+  const { items: solicitudes, pagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas, actualizarEnSilencio } = useListaPaginada(cargarPagina);
   // Al cambiar el filtro cambia `cargarPagina`, y con él `cargar`: la lista se vuelve a pedir desde la página 1.
   useCargarAlEntrar('/funcionario/solicitudes', cargar);
+  // Los cambios hechos por otros (p. ej. un funcionario que resuelve) aparecen sin recargar.
+  useRecargaAutomatica(useMatch('/funcionario/solicitudes') !== null, actualizarEnSilencio);
 
   // El catálogo se pide aparte para no repetirlo en cada cambio de filtro.
   const cargarCatalogo = useCallback((): void => {
