@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useRecargaAutomatica } from '../../hooks/useRecargaAutomatica';
+import { useCallback, useRef, useState } from 'react';
+import { useNavigate, useParams, useMatch } from 'react-router-dom';
 import {
   IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle,
   IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, IonSpinner,
@@ -32,6 +33,22 @@ const SolicitudDetailPage: React.FC = () => {
       .finally(() => setCargando(false));
   }, [id]);
   useCargarAlEntrar('/funcionario/solicitud/:id', cargar);
+
+  // Recarga automática: trae el estado actual (otro funcionario pudo resolverla)
+  // sin spinner y sin pisar las observaciones que se estén escribiendo.
+  const estadoVivo = useRef({ solicitud, observaciones, actualizando });
+  estadoVivo.current = { solicitud, observaciones, actualizando };
+  const actualizarEnSilencio = useCallback(async (): Promise<void> => {
+    const previo = estadoVivo.current;
+    if (!id || !previo.solicitud || previo.actualizando) return;
+    const item = await getSolicitudById(id);
+    const ahora = estadoVivo.current;
+    if (!item || ahora.actualizando || ahora.solicitud?.id !== item.id) return;
+    setSolicitud(item);
+    const sinEditar = ahora.observaciones === (ahora.solicitud?.observaciones ?? '');
+    if (sinEditar) setObservaciones(item.observaciones ?? '');
+  }, [id]);
+  useRecargaAutomatica(useMatch('/funcionario/solicitud/:id') !== null, actualizarEnSilencio);
 
   const cambiarEstado = async (estado: EstadoSolicitud): Promise<void> => {
     if (!solicitud) return;

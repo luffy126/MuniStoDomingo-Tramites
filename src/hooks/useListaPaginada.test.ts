@@ -99,4 +99,47 @@ describe('useListaPaginada', () => {
     expect(result.current.error).toBe('Sin conexión');
     expect(result.current.items.map((i) => i.id)).toEqual(['z', 'a']);
   });
+
+  it('actualizarEnSilencio vuelve a pedir las páginas cargadas sin spinner ni errores', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(pagina(['a', 'b'], 1, true))
+      .mockResolvedValueOnce(pagina(['c'], 2, false))
+      .mockResolvedValueOnce(pagina(['a', 'b'], 1, true))
+      .mockResolvedValueOnce(pagina(['c2'], 2, false))
+      .mockRejectedValue(new Error('Sin conexión'));
+    const { result } = renderHook(() => useListaPaginada<Item>(fetcher));
+
+    act(() => result.current.cargar());
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    act(() => result.current.cargarMas());
+    await waitFor(() => expect(result.current.items).toHaveLength(3));
+
+    await act(() => result.current.actualizarEnSilencio());
+    expect(fetcher.mock.calls.slice(2).map(([page]) => page)).toEqual([1, 2]);
+    expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b', 'c2']);
+    expect(result.current.cargando).toBe(false);
+
+    await act(() => result.current.actualizarEnSilencio());
+    expect(result.current.error).toBe('');
+    expect(result.current.items.map((i) => i.id)).toEqual(['a', 'b', 'c2']);
+  });
+
+  it('actualizarEnSilencio descarta su resultado si mientras tanto se recargó la lista', async () => {
+    let soltar!: (p: Pagina<Item>) => void;
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(pagina(['a'], 1, false, 1))
+      .mockImplementationOnce(() => new Promise((r) => { soltar = r; }))
+      .mockResolvedValueOnce(pagina(['nuevo'], 1, false, 1));
+    const { result } = renderHook(() => useListaPaginada<Item>(fetcher));
+    act(() => result.current.cargar());
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+
+    let silenciosa!: Promise<void>;
+    act(() => { silenciosa = result.current.actualizarEnSilencio(); });
+    act(() => result.current.cargar());
+    await waitFor(() => expect(result.current.items.map((i) => i.id)).toEqual(['nuevo']));
+    soltar(pagina(['viejo'], 1, false, 1));
+    await act(() => silenciosa);
+    expect(result.current.items.map((i) => i.id)).toEqual(['nuevo']);
+  });
 });

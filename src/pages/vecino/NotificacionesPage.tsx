@@ -1,3 +1,5 @@
+import { useMatch } from 'react-router-dom';
+import { useRecargaAutomatica } from '../../hooks/useRecargaAutomatica';
 import RecargarAlTirar from '../../components/common/RecargarAlTirar';
 import { TemaBoton } from '../../components/common/TemaToggle';
 import { useCallback, useState } from 'react';
@@ -16,8 +18,10 @@ const NotificacionesPage: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
 
   const cargarPagina = useCallback((page: number) => getNotificacionesPagina(page), []);
-  const { items: notificaciones, setItems, pagination, setPagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas } = useListaPaginada(cargarPagina);
+  const { items: notificaciones, setItems, pagination, setPagination, cargando, cargandoMas, error, limpiarError, cargar, recargar, cargarMas, actualizarEnSilencio } = useListaPaginada(cargarPagina);
   useCargarAlEntrar('/vecino/notificaciones', cargar);
+  // Los cambios hechos por otros (p. ej. un funcionario que resuelve) aparecen sin recargar.
+  useRecargaAutomatica(useMatch('/vecino/notificaciones') !== null, actualizarEnSilencio);
 
   const marcarLeida = async (notification: Notificacion): Promise<void> => {
     if (notification.leida) return;
