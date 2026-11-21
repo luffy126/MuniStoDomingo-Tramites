@@ -84,11 +84,11 @@ describe('apiClient', () => {
     expect(error).toMatchObject({ status: 409, message: 'El email ya está registrado' });
   });
 
-  it('si fetch rechaza, explica que no se pudo conectar con el servidor', async () => {
+  it('si fetch rechaza, explica que no se pudo conectar con el servicio', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
     await expect(apiClient.get('/api/tramites')).rejects.toThrow(
-      'No se pudo conectar con el servidor. Revisa que el backend esté ejecutándose.',
+      'No pudimos conectar con el servicio. Revisa tu conexión e inténtalo de nuevo.',
     );
   });
   it('getTodos recorre todas las páginas y junta los resultados', async () => {

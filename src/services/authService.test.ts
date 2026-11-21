@@ -19,7 +19,10 @@ const respuesta = (status: number, cuerpo?: unknown) => ({
   json: vi.fn().mockResolvedValue(cuerpo),
 });
 
-const vecino = { id: '1', nombre: 'Vecino Demo', email: 'vecino@test.com', rol: 'vecino' };
+const vecino = {
+  id: '1', nombre: 'Vecino Demo', email: 'vecino@test.com', rol: 'vecino',
+  telefono: null, direccion: null,
+};
 
 describe('recuperarSesion', () => {
   const fetchMock = vi.fn();

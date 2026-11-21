@@ -18,6 +18,10 @@ describe('rutaDeArranque', () => {
     expect(rutaDeArranque('/funcionario/solicitud/3', funcionario)).toBeNull();
     expect(rutaDeArranque('/login', null)).toBeNull();
     expect(rutaDeArranque('/register', null)).toBeNull();
+    expect(rutaDeArranque('/recuperar-password', null)).toBeNull();
+    expect(rutaDeArranque('/recuperar-password', vecino)).toBeNull();
+    expect(rutaDeArranque('/terminos', null)).toBeNull();
+    expect(rutaDeArranque('/vecino/mis-tramites/STD-2026-000001', vecino)).toBeNull();
   });
 
   it('sin sesión, un área privada va al login', () => {

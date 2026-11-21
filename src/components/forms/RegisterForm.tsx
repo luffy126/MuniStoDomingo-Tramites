@@ -1,6 +1,16 @@
-import { useState } from 'react';
-import { IonButton, IonCheckbox, IonInput, IonNote, IonSpinner } from '@ionic/react';
-import { REQUISITO_PASSWORD, esEmailValido, esPasswordSegura } from '../../utils/validators';
+import { useRef, useState } from 'react';
+import { IonCheckbox, IonNote } from '@ionic/react';
+import { Link } from 'react-router-dom';
+import CampoFormulario from './CampoFormulario';
+import BotonCargando from '../common/BotonCargando';
+import {
+  REQUISITO_PASSWORD,
+  validarConfirmacion,
+  validarEmail,
+  validarNombre,
+  validarPassword,
+} from '../../utils/validators';
+import { enfocarPrimerError } from '../../utils/formulario';
 import type { RegisterData } from '../../services/authService';
 
 interface RegisterFormProps {
@@ -16,38 +26,92 @@ interface ErroresRegistro {
   terminos?: string;
 }
 
-const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, cargando }) => {
-  const [nombre, setNombre] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [confirmacion, setConfirmacion] = useState<string>('');
-  const [aceptaTerminos, setAceptaTerminos] = useState<boolean>(false);
-  const [errores, setErrores] = useState<ErroresRegistro>({});
+type CampoRegistro = Exclude<keyof ErroresRegistro, 'terminos'>;
 
-  const validar = (): ErroresRegistro => {
-    const nuevos: ErroresRegistro = {};
-    if (nombre.trim().length < 3) {
-      nuevos.nombre = 'Ingresa tu nombre completo (mínimo 3 caracteres).';
+const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, cargando }) => {
+  const [nombre, setNombre] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmacion, setConfirmacion] = useState('');
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [errores, setErrores] = useState<ErroresRegistro>({});
+  const [tocados, setTocados] = useState<Record<CampoRegistro, boolean>>({
+    nombre: false,
+    email: false,
+    password: false,
+    confirmacion: false,
+  });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const validarCampo = (campo: CampoRegistro, valor: string): string | undefined => {
+    switch (campo) {
+      case 'nombre':
+        return validarNombre(valor);
+      case 'email':
+        return validarEmail(valor);
+      case 'password':
+        return validarPassword(valor);
+      case 'confirmacion':
+        return validarConfirmacion(password, valor);
     }
-    if (!esEmailValido(email)) {
-      nuevos.email = 'Ingresa un correo con formato válido.';
+  };
+
+  const valorDe = (campo: CampoRegistro): string => {
+    switch (campo) {
+      case 'nombre':
+        return nombre;
+      case 'email':
+        return email;
+      case 'password':
+        return password;
+      case 'confirmacion':
+        return confirmacion;
     }
-    if (!esPasswordSegura(password)) {
-      nuevos.password = REQUISITO_PASSWORD;
+  };
+
+  const actualizar = (campo: CampoRegistro, valor: string): void => {
+    if (campo === 'nombre') setNombre(valor);
+    if (campo === 'email') setEmail(valor);
+    if (campo === 'password') setPassword(valor);
+    if (campo === 'confirmacion') setConfirmacion(valor);
+
+    if (tocados[campo]) {
+      setErrores((previos) => ({ ...previos, [campo]: validarCampo(campo, valor) }));
     }
-    if (confirmacion !== password || confirmacion === '') {
-      nuevos.confirmacion = 'Las contraseñas no coinciden.';
+    if (campo === 'password' && tocados.confirmacion) {
+      setErrores((previos) => ({
+        ...previos,
+        confirmacion: validarConfirmacion(valor, confirmacion),
+      }));
     }
-    if (!aceptaTerminos) {
-      nuevos.terminos = 'Debes aceptar los términos y condiciones.';
-    }
-    return nuevos;
+  };
+
+  const marcarTocado = (campo: CampoRegistro): void => {
+    setTocados((previos) => ({ ...previos, [campo]: true }));
+    setErrores((previos) => ({
+      ...previos,
+      [campo]: validarCampo(campo, valorDe(campo)),
+    }));
   };
 
   const manejarEnvio = async (): Promise<void> => {
-    const nuevos = validar();
+    const nuevos: ErroresRegistro = {
+      nombre: validarNombre(nombre),
+      email: validarEmail(email),
+      password: validarPassword(password),
+      confirmacion: validarConfirmacion(password, confirmacion),
+      terminos: aceptaTerminos ? undefined : 'Debes aceptar los términos y condiciones.',
+    };
+    setTocados({ nombre: true, email: true, password: true, confirmacion: true });
     setErrores(nuevos);
-    if (Object.keys(nuevos).length > 0) {
+    if (Object.values(nuevos).some((error) => error !== undefined)) {
+      window.setTimeout(() => {
+        if (nuevos.terminos !== undefined && formRef.current !== null) {
+          formRef.current.querySelector<HTMLElement>('#register-terminos')?.focus();
+        } else {
+          enfocarPrimerError(formRef.current);
+        }
+      }, 0);
       return;
     }
     await onSubmit({ nombre: nombre.trim(), email: email.trim(), password, rol: 'vecino' });
@@ -55,26 +119,27 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, cargando }) => {
 
   return (
     <form
+      ref={formRef}
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void manejarEnvio();
       }}
     >
-      <IonInput
+      <CampoFormulario
+        id="register-nombre"
         label="Nombre completo"
         labelPlacement="floating"
         fill="outline"
         autocomplete="name"
         value={nombre}
-        onIonInput={(event) => setNombre(event.detail.value ?? '')}
+        error={errores.nombre}
+        onValorChange={(valor) => actualizar('nombre', valor)}
+        onIonBlur={() => marcarTocado('nombre')}
       />
-      {errores.nombre !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
-          {errores.nombre}
-        </IonNote>
-      ) : null}
 
-      <IonInput
+      <CampoFormulario
+        id="register-email"
         label="Correo electrónico"
         labelPlacement="floating"
         fill="outline"
@@ -82,69 +147,79 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit, cargando }) => {
         inputmode="email"
         autocomplete="email"
         value={email}
+        error={errores.email}
         className="ion-margin-top"
-        onIonInput={(event) => setEmail(event.detail.value ?? '')}
+        onValorChange={(valor) => actualizar('email', valor)}
+        onIonBlur={() => marcarTocado('email')}
       />
-      {errores.email !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
-          {errores.email}
-        </IonNote>
-      ) : null}
 
-      <IonInput
+      <CampoFormulario
+        id="register-password"
         label="Contraseña"
         labelPlacement="floating"
         fill="outline"
         type="password"
         autocomplete="new-password"
         value={password}
+        error={errores.password}
         className="ion-margin-top"
-        onIonInput={(event) => setPassword(event.detail.value ?? '')}
+        onValorChange={(valor) => actualizar('password', valor)}
+        onIonBlur={() => marcarTocado('password')}
       />
-      {errores.password !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
-          {errores.password}
-        </IonNote>
-      ) : (
+      {errores.password === undefined ? (
         <IonNote color="medium" className="mensaje-error">
           {REQUISITO_PASSWORD}
         </IonNote>
-      )}
+      ) : null}
 
-      <IonInput
+      <CampoFormulario
+        id="register-confirmacion"
         label="Confirmar contraseña"
         labelPlacement="floating"
         fill="outline"
         type="password"
         autocomplete="new-password"
         value={confirmacion}
+        error={errores.confirmacion}
         className="ion-margin-top"
-        onIonInput={(event) => setConfirmacion(event.detail.value ?? '')}
+        onValorChange={(valor) => actualizar('confirmacion', valor)}
+        onIonBlur={() => marcarTocado('confirmacion')}
       />
-      {errores.confirmacion !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
-          {errores.confirmacion}
-        </IonNote>
-      ) : null}
 
       <IonCheckbox
+        id="register-terminos"
         className="ion-margin-top"
         labelPlacement="end"
         justify="start"
         checked={aceptaTerminos}
-        onIonChange={(event) => setAceptaTerminos(event.detail.checked)}
+        aria-invalid={errores.terminos !== undefined}
+        aria-describedby={errores.terminos !== undefined ? 'register-terminos-error' : undefined}
+        onIonChange={(event) => {
+          setAceptaTerminos(event.detail.checked);
+          if (event.detail.checked) {
+            setErrores((previos) => ({ ...previos, terminos: undefined }));
+          }
+        }}
       >
         Acepto los términos y condiciones
       </IonCheckbox>
+      <IonNote className="mensaje-error">
+        <Link to="/terminos">Lee los términos y la política de privacidad</Link>
+      </IonNote>
       {errores.terminos !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
+        <IonNote id="register-terminos-error" color="danger" className="mensaje-error" role="alert">
           {errores.terminos}
         </IonNote>
       ) : null}
 
-      <IonButton type="submit" expand="block" className="ion-margin-top" disabled={cargando}>
-        {cargando ? <IonSpinner name="dots" /> : 'Registrarse'}
-      </IonButton>
+      <BotonCargando
+        type="submit"
+        expand="block"
+        className="ion-margin-top"
+        cargando={cargando}
+        texto="Registrarse"
+        textoCargando="Creando cuenta…"
+      />
     </form>
   );
 };

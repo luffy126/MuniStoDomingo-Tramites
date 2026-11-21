@@ -61,6 +61,20 @@ Detalle técnico de la API en la rama `backend` (`docs/API.md`).
 | RNF-04 | Accesibilidad WCAG AA | Accesibilidad | WCAG 2.1 nivel AA (contraste ≥ 4.5:1, navegación por teclado, etiquetas ARIA) |
 | RNF-05 | Multiplataforma | Compatibilidad | Funcionamiento en Chrome, Firefox y Safari, y en móvil vía Capacitor (iOS/Android) |
 
+### Arranque y fuentes
+
+- Las tipografías Montserrat y Poppins se sirven desde `public/fonts` como WOFF2, con
+  `font-display: swap` y preload. No hay peticiones bloqueantes a Google Fonts.
+- `index.html` pinta un shell municipal inmediato mientras descarga el bundle; React lo reemplaza
+  en el primer render. El tema claro es el defecto: el modo oscuro solo se activa si el usuario
+  lo elige a mano (botón del header o interruptor de Perfil/menú), nunca por la configuración
+  del sistema. La elección se guarda en `muni-tema` y el shell la respeta antes del primer
+  paint; también se respeta `prefers-reduced-motion`.
+- El service worker usa `munisd-shell-v2` y precarga también las fuentes. `/api/` sigue siendo
+  network-only: no se cachean respuestas autenticadas.
+- `App.tsx` importa solo las utilidades CSS de Ionic usadas (`padding` y `text-alignment`);
+  las de float, flex, display y text-transform se omiten para no pagarlas en cada carga.
+
 ## Tecnologías y herramientas
 
 **Frontend**
@@ -110,12 +124,16 @@ npx ionic capacitor run ios
 ## Conexión con el backend
 
 El frontend consume la API de la rama `backend`, que debe ejecutarse por separado con
-MySQL/MariaDB disponible y su esquema/datos semilla cargados. En el backend, configura
-`FRONTEND_URL=http://localhost:5173` para permitir el origen de Vite.
+MySQL/MariaDB disponible y su esquema/datos semilla cargados.
 
-Por defecto, la app usa `http://localhost:3000`. Para apuntar a otro servidor, crea un
-archivo `.env` en la raíz del frontend basándote en `.env.example` y define `VITE_API_URL`.
-La URL debe ser el origen del servidor, sin `/api` al final.
+Por defecto la app usa rutas **same-origin** que empiezan con `/api`. En desarrollo, Vite
+(`npm run dev`, puerto 5173) y `vite preview` (puerto 4173) proxian `/api` a
+`http://localhost:3000`. El destino se puede cambiar con la variable `BACKEND_URL` del proceso
+que inicia Vite; el navegador sigue hablando solo con el frontend.
+
+Si el backend está en otro origen, define `VITE_API_URL` en un `.env` del frontend (basado en
+`.env.example`) y habilita CORS en el backend con `FRONTEND_URL`. La URL debe ser el origen del
+servidor, sin `/api` al final.
 
 En PowerShell puedes instalar e iniciar el frontend con:
 
@@ -124,16 +142,25 @@ npm.cmd install
 npm.cmd run dev
 ```
 
+Para probar el build de producción contra la misma API:
+
+```powershell
+npm.cmd run build
+npm.cmd run preview
+```
+
 La referencia de endpoints y ejemplos está en [`docs/API.md` de la rama `backend`](https://github.com/luffy126/MuniStoDomingo-Tramites/blob/backend/docs/API.md).
 La colección Postman está en la raíz de la rama `backend` (`postman_collection.json`).
 
 ## Integración con la API
 
-- **`src/services/apiClient.ts`**: cliente central de `fetch`. Usa `VITE_API_URL` como URL base, envía
-  el token Bearer guardado en `localStorage` y espera el sobre `{ success, data, error }`. Un 204 devuelve
-  `undefined`. Ante un 401 borra la sesión y dispara el evento `munisd:unauthorized`, que cierra la
-  sesión en `AuthContext`. Los errores se lanzan como `ApiError` (con `status` y el mensaje del backend);
-  si el servidor no responde, el mensaje explica que no hay conexión.
+- **`src/services/apiClient.ts`**: cliente central de `fetch`. Por defecto usa la URL base vacía
+  (rutas `/api` same-origin) y solo antepone `VITE_API_URL` si se configuró un backend externo.
+  Envía el token Bearer guardado en `localStorage` y espera el sobre `{ success, data, error }`. Un
+  204 devuelve `undefined`. Ante un 401 borra la sesión y dispara el evento
+  `munisd:unauthorized`, que cierra la sesión en `AuthContext`. Los errores se lanzan como
+  `ApiError` (con `status` y el mensaje del backend); si el servidor no responde, el mensaje
+  explica que no hay conexión.
 - **`AuthContext`**: guarda al usuario; al abrir la app recupera la sesión con `GET /api/auth/me`.
   También expone `login`, `register`, `actualizarPerfil` y `logout`.
 - **Rutas protegidas**: `PrivateRoute` exige sesión y `RoleRoute` exige el rol (`vecino` o
@@ -148,28 +175,54 @@ La colección Postman está en la raíz de la rama `backend` (`postman_collectio
 | Pantalla | Qué hace | Endpoint |
 | --- | --- | --- |
 | Login / Registro | Inicia sesión o crea la cuenta de vecino | `POST /api/auth/login`, `POST /api/auth/register` |
+| Recuperar contraseña | Solicita un enlace y define una contraseña nueva | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` |
 | Catálogo (vecino) | Lista y filtra los trámites | `GET /api/tramites` |
 | Detalle del trámite | Muestra requisitos y envía la solicitud | `GET /api/tramites/:id`, `POST /api/solicitudes` |
 | Mis trámites | Lista las solicitudes propias y cancela las pendientes | `GET /api/solicitudes`, `DELETE /api/solicitudes/:folio` |
-| Notificaciones | Lista los avisos y los marca como leídos | `GET /api/notificaciones`, `PATCH /api/notificaciones/:id` |
-| Perfil | Muestra y edita nombre y correo | `GET /api/auth/me`, `PUT /api/auth/me` |
-| Solicitudes (funcionario) | Bandeja con filtro por estado | `GET /api/solicitudes` |
-| Detalle de solicitud (funcionario) | Aprueba, rechaza o pone en revisión con observaciones | `GET /api/solicitudes/:folio`, `PATCH /api/solicitudes/:folio` |
-| Reportes (funcionario) | Totales por estado y por trámite | `GET /api/solicitudes/reportes`, `GET /api/solicitudes` |
+| Detalle de mi solicitud | Muestra estado, historial, documentos y permite cancelar | `GET /api/solicitudes/:folio`, endpoints de documentos |
+| Notificaciones | Lista los avisos, los marca como leídos y enlaza al detalle | `GET /api/notificaciones`, `PATCH /api/notificaciones/leidas`, `PATCH /api/notificaciones/:id` |
+| Perfil | Muestra y edita nombre, correo, teléfono y dirección | `GET /api/auth/me`, `PUT /api/auth/me` |
+| Solicitudes (funcionario) | Bandeja con búsqueda, filtros, orden y persistencia | `GET /api/solicitudes` |
+| Detalle de solicitud (funcionario) | Resuelve con confirmación, ajusta prioridad/plazo, ve historial y documentos | `GET /api/solicitudes/:folio`, `PATCH /api/solicitudes/:folio`, `PATCH /api/solicitudes/:folio/prioridad` |
+| Reportes (funcionario) | Agregados por estado, trámite y prioridad; exportación CSV | `GET /api/solicitudes/reportes` |
 
 ## Pruebas
 
 ```bash
-npx tsc --noEmit    # tipos
-npm run lint        # ESLint (admite 1 warning de react-refresh en AuthContext)
-npx vitest run      # pruebas unitarias (apiClient y arranque de la app)
-npx cypress run     # flujos de punta a punta
+npm run verify      # typecheck + ESLint + 77 pruebas unitarias
+npm run build       # verifica el build de producción
+npm run test.e2e    # Cypress: documentos, flujos, navegación y responsive
 ```
 
 Cypress necesita el backend corriendo en `:3000` con la base en su semilla (`schema.sql`) y el
-frontend en `:5173` (`npm run dev`). Los flujos crean y modifican datos: al terminar, reinicia la base
-ejecutando de nuevo `schema.sql` en el backend. Si Electron se cae por la GPU
-(`GPU process isn't usable`), ejecuta Cypress con
+frontend en `:5173` (`npm run dev`). Los flujos crean y modifican datos: al terminar, reinicia la
+base ejecutando de nuevo `schema.sql` en el backend. En PowerShell, fija `$OutputEncoding` antes
+de redirigir el archivo para que los acentos de la semilla no se conviertan en `??`:
+
+```powershell
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+Get-Content back/schema.sql -Encoding UTF8 -Raw |
+  & "C:\xampp\mysql\bin\mysql.exe" -u root --default-character-set=utf8mb4
+```
+
+La suite completa hace varios inicios de sesión y más de 100 peticiones en menos de un minuto.
+Para desarrollo se pueden subir los límites del backend sin cambiar los valores seguros de
+producción:
+
+```bash
+# en back/.env, solo para ejecutar E2E
+AUTH_RATE_LIMIT_MAX=50
+GENERAL_RATE_LIMIT_MAX=1000
+```
+
+El spec de capturas visuales es una herramienta manual y no forma parte de `npm run test.e2e`:
+
+```bash
+npx cypress run --spec cypress/visual/capturas-rediseno.cy.ts \
+  --config baseUrl=http://localhost:5173,screenshotsFolder=capturas/cypress
+```
+
+Si Electron se cae por la GPU (`GPU process isn't usable`), ejecuta Cypress con
 `ELECTRON_EXTRA_LAUNCH_ARGS='--disable-gpu --no-sandbox --in-process-gpu'` (en PowerShell:
 `$env:ELECTRON_EXTRA_LAUNCH_ARGS='--disable-gpu --no-sandbox --in-process-gpu'`).
 
@@ -180,14 +233,32 @@ src/
 ├── App.tsx, main.tsx          Raíz de la app: Ionic, AuthProvider y rutas
 ├── components/                Componentes reutilizables (common, forms, tramites)
 ├── context/AuthContext.tsx    Sesión del usuario
-├── hooks/                     useCargarAlEntrar
+├── hooks/                     useAuth, useCargarAlEntrar, useListaPaginada, useTema
 ├── pages/                     auth, vecino (pestañas) y funcionario (menú lateral)
 ├── routes/                    AppRoutes, PrivateRoute, RoleRoute, Redireccion
-├── services/                  apiClient, authService y tramiteService
+├── services/                  apiClient, authService, storageService y tramiteService
 ├── theme/                     Variables y estilos globales
-└── utils/                     Validadores e íconos
-cypress/e2e/                   navegacion.cy.ts y flujos.cy.ts
+└── utils/                     Validadores, fechas, texto e íconos
+cypress/e2e/                   documentos, flujos, navegacion, rendimiento y responsive
+cypress/visual/                capturas manuales del rediseño
 ```
+
+## Carga perezosa y estabilidad de navegación
+
+Las páginas siguen siendo `React.lazy`, pero cada ruta tiene su propio `Suspense` con
+`fallback={null}`; el `IonRouterOutlet` continúa siendo hijo directo de `IonTabs` o
+`IonSplitPane`. Así, al abrir una pestaña no se desmonta la barra inferior ni se monta
+una página de carga que Ionic dejaría invisible. Los layouts (`VecinoTabs` y
+`FuncionarioLayout`) se importan directo porque son el cascarón de la sesión.
+
+El catálogo de trámites se precarga al entrar y se mantiene en caché de memoria
+5 minutos con dedupe de petición. Es público; nunca se cachean datos personales ni
+respuestas autenticadas. Al volver a una pestaña ya visitada, `useCargarAlEntrar`
+usa la recarga silenciosa del listado en lugar de mostrar el esqueleto otra vez.
+
+`cypress/e2e/rendimiento.cy.ts` verifica este comportamiento: el chunk de `PerfilPage`
+no se pide al entrar al dashboard, se pide al abrir Perfil, y `ion-tab-bar` conserva
+el mismo nodo DOM durante todos los cambios de pestaña.
 
 ## Diseño y prototipo
 - [Prototipo en Figma](https://www.figma.com/design/PDRMB1YzTolGblTi9Cxy10/MuniSitioDomingo?node-id=0-1&t=wjmz0PMK0jp7Rtdt-1)

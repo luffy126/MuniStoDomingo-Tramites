@@ -21,6 +21,20 @@ http://ionicframework.com/docs/theming/ */
   --muni-radio: 14px;
   --muni-sombra: 0 1px 2px rgba(13, 31, 97, 0.06), 0 4px 14px rgba(13, 31, 97, 0.07);
 
+  /* Material 3 — botones. Altura cómoda para pantallas táctiles, forma
+     completamente redondeada (equivalente al shape full de M3) y elevación 1.
+     Las capas de estado se explican en docs/PROGRESO_ESTETICA_BOTONES.md. */
+  --muni-boton-altura: 44px;
+  --muni-boton-altura-grande: 48px;
+  --muni-boton-radio: 22px;
+  --muni-boton-padding-x: 20px;
+  --muni-boton-padding-icono: 12px;
+  --muni-boton-sombra: 0 1px 2px rgba(13, 31, 97, 0.10), 0 2px 8px rgba(13, 31, 97, 0.10);
+  --muni-boton-sombra-hover: 0 2px 4px rgba(13, 31, 97, 0.12), 0 6px 16px rgba(13, 31, 97, 0.14);
+  --muni-estado-hover: rgba(13, 31, 97, 0.08);
+  --muni-estado-pulsado: rgba(13, 31, 97, 0.14);
+  --muni-estado-toolbar: rgba(255, 255, 255, 0.16);
+
   --ion-color-primary: #0d1f61;
   --ion-color-primary-rgb: 13, 31, 97;
   --ion-color-primary-contrast: #ffffff;
@@ -63,12 +77,13 @@ http://ionicframework.com/docs/theming/ */
   --ion-color-danger-shade: #9e1f15;
   --ion-color-danger-tint: #bc392f;
 
-  --ion-color-medium: #6b7280;
-  --ion-color-medium-rgb: 107, 114, 128;
+  /* 5.31:1 sobre el fondo #f3f6f3 (el gris anterior daba 4.44:1). */
+  --ion-color-medium: #5f6673;
+  --ion-color-medium-rgb: 95, 102, 115;
   --ion-color-medium-contrast: #ffffff;
   --ion-color-medium-contrast-rgb: 255, 255, 255;
-  --ion-color-medium-shade: #5e6471;
-  --ion-color-medium-tint: #7a808d;
+  --ion-color-medium-shade: #545a65;
+  --ion-color-medium-tint: #6f7581;
 
   --ion-color-light: #f3f6f3;
   --ion-color-light-rgb: 243, 246, 243;
@@ -93,7 +108,7 @@ http://ionicframework.com/docs/theming/ */
   --ion-item-background: var(--muni-superficie);
   --ion-toolbar-background: var(--muni-superficie);
   --ion-tab-bar-background: var(--muni-superficie);
-  --ion-tab-bar-color: #6b7280;
+  --ion-tab-bar-color: var(--ion-color-medium);
   --ion-tab-bar-color-selected: var(--muni-azul-marino);
 }
 
@@ -108,12 +123,25 @@ http://ionicframework.com/docs/theming/ */
   --muni-texto-suave: #a9b2c3;
   --muni-sombra: 0 1px 2px rgba(0, 0, 0, 0.4);
 
+  --muni-boton-sombra: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.32);
+  --muni-boton-sombra-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 6px 16px rgba(0, 0, 0, 0.36);
+  --muni-estado-hover: rgba(143, 176, 255, 0.14);
+  --muni-estado-pulsado: rgba(143, 176, 255, 0.22);
+
   --ion-color-primary: #8fb0ff;
   --ion-color-primary-rgb: 143, 176, 255;
   --ion-color-primary-contrast: #0d1f61;
   --ion-color-primary-contrast-rgb: 13, 31, 97;
   --ion-color-primary-shade: #7e9be0;
   --ion-color-primary-tint: #9ab8ff;
+
+  /* 7.89:1 sobre la superficie oscura #131c36. */
+  --ion-color-medium: #a9b2c3;
+  --ion-color-medium-rgb: 169, 178, 195;
+  --ion-color-medium-contrast: #0b1226;
+  --ion-color-medium-contrast-rgb: 11, 18, 38;
+  --ion-color-medium-shade: #949cab;
+  --ion-color-medium-tint: #b2bac9;
 
   --ion-color-secondary: #5c9ae0;
   --ion-color-secondary-rgb: 92, 154, 224;
@@ -124,13 +152,18 @@ http://ionicframework.com/docs/theming/ */
 
   --ion-color-success: #4caf78;
   --ion-color-success-rgb: 76, 175, 120;
+  --ion-color-success-contrast: #0b1226;
+  --ion-color-success-contrast-rgb: 11, 18, 38;
   --ion-color-success-shade: #439a6a;
   --ion-color-success-tint: #5eb786;
 
-  --ion-color-danger: #e04848;
-  --ion-color-danger-rgb: 224, 72, 72;
-  --ion-color-danger-shade: #c53f3f;
-  --ion-color-danger-tint: #e35a5a;
+  /* #f06565 alcanza 4,5:1 sobre la superficie oscura #131c36. */
+  --ion-color-danger: #f06565;
+  --ion-color-danger-rgb: 240, 101, 101;
+  --ion-color-danger-contrast: #0b1226;
+  --ion-color-danger-contrast-rgb: 11, 18, 38;
+  --ion-color-danger-shade: #d45959;
+  --ion-color-danger-tint: #f27d7d;
 
   --ion-background-color: var(--muni-fondo);
   --ion-background-color-rgb: 11, 18, 38;

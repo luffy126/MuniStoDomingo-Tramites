@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test.e2e": "cypress run",
     "test.unit": "vitest",
-    "lint": "eslint"
+    "test.unit:run": "vitest run",
+    "lint": "eslint src",
+    "lighthouse": "npx --yes @lhci/cli autorun --config=lighthouserc.json",
+    "verify": "npm run typecheck && npm run lint && npm run test.unit:run"
   },
   "dependencies": {
     "@capacitor/app": "8.1.1",
@@ -36,6 +40,7 @@
     "@types/react-dom": "19.0.4",
     "@vitejs/plugin-legacy": "^8.0.0",
     "@vitejs/plugin-react": "^6.0.0",
+    "axe-core": "^4.14.1",
     "cypress": "^13.5.0",
     "eslint": "^9.20.1",
     "eslint-plugin-react": "^7.32.2",

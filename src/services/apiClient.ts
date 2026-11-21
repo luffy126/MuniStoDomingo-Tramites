@@ -1,6 +1,7 @@
 import storageService from './storageService';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+/** Vacío por defecto: las rutas ya empiezan con `/api` y salen por el proxy same-origin. */
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 export const TOKEN_KEY = 'munisd.token';
 export const SESSION_KEY = 'munisd.sesion';
 export const UNAUTHORIZED_EVENT = 'munisd:unauthorized';
@@ -74,6 +75,21 @@ export class ApiError extends Error {
   }
 }
 
+/** Si el token dejó de servir, se cierra la sesión en todas las pestañas. */
+const manejarNoAutorizado = (): void => {
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Ignorar si el almacenamiento no está disponible.
+  }
+  // También el respaldo: si no, la próxima apertura restauraría un token vencido.
+  tokenEnMemoria = null;
+  void storageService.remove(TOKEN_KEY);
+  void storageService.remove(SESSION_KEY);
+  window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+};
+
 const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> => {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -93,7 +109,7 @@ const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<Ap
     throw new Error(
       controlador.signal.aborted
         ? 'El servidor tardó demasiado en responder. Intenta de nuevo en un momento.'
-        : 'No se pudo conectar con el servidor. Revisa que el backend esté ejecutándose.',
+        : 'No pudimos conectar con el servicio. Revisa tu conexión e inténtalo de nuevo.',
     );
   } finally {
     clearTimeout(temporizador);
@@ -109,19 +125,7 @@ const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<Ap
     throw new ApiError('El servidor devolvió una respuesta inválida.', response.status);
   }
 
-  if (response.status === 401) {
-    try {
-      window.localStorage.removeItem(TOKEN_KEY);
-      window.localStorage.removeItem(SESSION_KEY);
-    } catch {
-      // Ignorar si el almacenamiento no está disponible.
-    }
-    // También el respaldo: si no, la próxima apertura restauraría un token vencido.
-    tokenEnMemoria = null;
-    void storageService.remove(TOKEN_KEY);
-    void storageService.remove(SESSION_KEY);
-    window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-  }
+  if (response.status === 401) manejarNoAutorizado();
 
   if (!response.ok || body.success !== true) {
     throw new ApiError(body.error || `Error de comunicación con el servidor (${response.status}).`, response.status);
@@ -169,12 +173,106 @@ const getPagina = async <T>(path: string, page = 1, limit = LIMITE_POR_DEFECTO):
   };
 };
 
+/**
+ * Descarga un archivo autenticado. No se pone el token en la URL: viaja en la
+ * cabecera, igual que en el resto de la API.
+ */
+const getBlob = async (path: string): Promise<{ blob: Blob; tipo: string }> => {
+  const headers = new Headers({ Accept: 'application/octet-stream' });
+  const token = leerToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers,
+      signal: controlador.signal,
+    });
+  } catch {
+    throw new Error('No pudimos descargar el archivo. Revisa tu conexión e inténtalo de nuevo.');
+  } finally {
+    clearTimeout(temporizador);
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) manejarNoAutorizado();
+    let mensaje = `No se pudo descargar el archivo (${response.status}).`;
+    try {
+      const cuerpo = await response.json() as ApiEnvelope<unknown>;
+      mensaje = cuerpo.error ?? mensaje;
+    } catch {
+      // La respuesta no era JSON: se conserva el mensaje genérico.
+    }
+    throw new ApiError(mensaje, response.status);
+  }
+
+  return { blob: await response.blob(), tipo: response.headers.get('content-type') ?? 'application/octet-stream' };
+};
+
+/**
+ * Sube un archivo con progreso real. `fetch` no expone `upload.onprogress`,
+ * así que esta es la única parte del cliente que usa XHR.
+ */
+const postArchivoConProgreso = <T>(
+  path: string,
+  archivo: File,
+  onProgreso?: (porcentaje: number) => void,
+  cabecerasExtra?: Record<string, string>
+): Promise<T> => new Promise<T>((resolve, reject) => {
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${API_BASE_URL}${path}`);
+  xhr.timeout = 60_000;
+  xhr.setRequestHeader('Accept', 'application/json');
+  xhr.setRequestHeader('Content-Type', archivo.type || 'application/octet-stream');
+  xhr.setRequestHeader('X-Nombre-Archivo', encodeURIComponent(archivo.name));
+  for (const [nombre, valor] of Object.entries(cabecerasExtra ?? {})) xhr.setRequestHeader(nombre, valor);
+  const token = leerToken();
+  if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+  if (onProgreso) {
+    xhr.upload.onprogress = (evento) => {
+      if (evento.lengthComputable && evento.total > 0) {
+        onProgreso(Math.min(100, Math.round((evento.loaded * 100) / evento.total)));
+      }
+    };
+  }
+
+  xhr.onload = () => {
+    if (xhr.status === 401) manejarNoAutorizado();
+    let cuerpo: ApiEnvelope<T>;
+    try {
+      cuerpo = JSON.parse(xhr.responseText) as ApiEnvelope<T>;
+    } catch {
+      reject(new ApiError('El servidor devolvió una respuesta inválida.', xhr.status));
+      return;
+    }
+    if (xhr.status >= 200 && xhr.status < 300 && cuerpo.success) {
+      onProgreso?.(100);
+      resolve(cuerpo.data as T);
+      return;
+    }
+    reject(new ApiError(
+      cuerpo.error || `No se pudo subir el archivo (${xhr.status}).`,
+      xhr.status,
+    ));
+  };
+  xhr.onerror = () => reject(new Error('No pudimos subir el archivo. Revisa tu conexión e inténtalo de nuevo.'));
+  xhr.ontimeout = () => reject(new Error('El servidor tardó demasiado en recibir el archivo. Intenta de nuevo.'));
+  xhr.send(archivo);
+});
+
 export default {
   get: <T>(path: string): Promise<T> => apiClient<T>(path),
   getTodos,
   getPagina,
+  getBlob,
   post: <T>(path: string, data: unknown): Promise<T> =>
     apiClient<T>(path, { method: 'POST', body: JSON.stringify(data) }),
+  postArchivo: <T>(path: string, archivo: File): Promise<T> =>
+    postArchivoConProgreso<T>(path, archivo),
+  postArchivoConProgreso,
   put: <T>(path: string, data: unknown): Promise<T> =>
     apiClient<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
   patch: <T>(path: string, data?: unknown): Promise<T> =>

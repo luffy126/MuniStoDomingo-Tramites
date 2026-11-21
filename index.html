@@ -1,38 +1,112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es-CL">
   <head>
     <meta charset="utf-8" />
     <title>Trámites · Municipalidad de Santo Domingo</title>
+    <meta
+      name="description"
+      content="Sitio de trámites en línea de la Municipalidad de Santo Domingo: solicita, adjunta documentos y revisa el estado de tus solicitudes."
+    />
     <meta name="theme-color" content="#0d1f61" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap"
-    />
-    
+    <!-- Fuentes locales: sin petición bloqueante a terceros durante el arranque. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/montserrat-latin.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/poppins-600-latin.woff2" crossorigin />
+
     <base href="/" />
-    
-    <meta name="color-scheme" content="light dark" />
+
+    <!--
+      El tema claro es el defecto: el navegador no debe aplicar su paleta oscura
+      por la configuración del sistema. useTema actualiza este valor cuando el
+      usuario cambia el tema a mano.
+    -->
+    <meta name="color-scheme" content="light" />
     <meta
       name="viewport"
-      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="viewport-fit=cover, width=device-width, initial-scale=1.0"
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
-    
+
     <link rel="manifest" href="/manifest.json" />
-    
-    <link rel="shortcut icon" type="image/png" href="/logo-municipal.png" />
-    
-    <!-- add to homescreen for ios -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Ionic App" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Trámites Santo Domingo" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- Pantalla instantánea: se pinta antes de que llegue el bundle y React la reemplaza. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #f3f6f3; color: #1f2a37; }
+      #app-loading {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        background: #f3f6f3; z-index: 9999;
+        font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      }
+      .carga-marca {
+        width: min(320px, calc(100vw - 48px)); padding: 24px;
+        text-align: center; background: #ffffff; border-radius: 20px;
+        border: 1px solid #dde3e8;
+        box-shadow: 0 10px 30px rgba(13, 31, 97, 0.10);
+      }
+      .carga-marca img {
+        display: block; width: 84px; height: 84px; margin: 0 auto 12px;
+        object-fit: contain; background: #ffffff; border-radius: 16px;
+      }
+      .carga-marca strong { display: block; color: #0d1f61; font-size: 16px; }
+      .carga-marca small { display: block; margin-top: 4px; color: #4f5655; font-size: 12px; }
+      .carga-linea {
+        height: 4px; margin-top: 16px; border-radius: 999px; overflow: hidden;
+        background: #dde3e8;
+      }
+      .carga-linea::after {
+        content: ''; display: block; width: 40%; height: 100%; border-radius: inherit;
+        background: #1e64b4; animation: carga-deslizar 1.1s ease-in-out infinite;
+      }
+      @keyframes carga-deslizar {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+      }
+      /* Modo oscuro: solo si el usuario lo eligió (clase `shell-oscuro`), nunca
+         por prefers-color-scheme. La clase la pone el script de abajo antes del
+         primer paint y la mantiene useTema. */
+      html.shell-oscuro, html.shell-oscuro body, html.shell-oscuro #app-loading {
+        background: #131c36; color: #e8ecf5;
+      }
+      html.shell-oscuro .carga-marca { background: #1b2543; border-color: #2f3b5c; box-shadow: none; }
+      html.shell-oscuro .carga-marca img { background: #ffffff; }
+      html.shell-oscuro .carga-marca strong { color: #ffffff; }
+      html.shell-oscuro .carga-marca small { color: #b8c1d9; }
+      html.shell-oscuro .carga-linea { background: #2f3b5c; }
+      @media (prefers-reduced-motion: reduce) {
+        .carga-linea::after { animation: none; width: 100%; }
+      }
+    </style>
+
+    <!-- Tema guardado por el usuario, leído antes del primer pintado. -->
+    <script>
+      try {
+        if (localStorage.getItem('muni-tema') === 'oscuro') {
+          document.documentElement.classList.add('shell-oscuro');
+        }
+      } catch (error) {
+        /* Modo privado: se abre en claro. */
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-loading" role="status" aria-live="polite">
+        <div class="carga-marca">
+          <img src="/logo-municipal.png" width="84" height="84" alt="Escudo de la Municipalidad de Santo Domingo" />
+          <strong>Municipalidad de Santo Domingo</strong>
+          <small>Preparando el portal de trámites…</small>
+          <div class="carga-linea" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

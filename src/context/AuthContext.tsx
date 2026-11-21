@@ -1,26 +1,21 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   actualizarPerfilRequest,
   limpiarSesion,
   loginRequest,
+  verificarCodigoRequest,
+  cambiarDosFactoresRequest,
+  confirmarDosFactoresRequest,
   recuperarSesion,
   registerRequest,
 } from '../services/authService';
 import { UNAUTHORIZED_EVENT } from '../services/apiClient';
-import type { PerfilData, RegisterData, User } from '../services/authService';
-
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (data: RegisterData) => Promise<User>;
-  actualizarPerfil: (data: PerfilData) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import type {
+  ConfirmacionPendiente, PerfilData, RegisterData, ResultadoLogin, User,
+} from '../services/authService';
+import { AuthContext } from './authContextDefinition';
+import type { AuthContextType } from './authContextDefinition';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -46,10 +41,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<User> => {
-    const signedInUser = await loginRequest(email, password);
+  const login = useCallback(async (email: string, password: string): Promise<ResultadoLogin> => {
+    const resultado = await loginRequest(email, password);
+    if (resultado.tipo === 'sesion') setUser(resultado.user);
+    return resultado;
+  }, []);
+
+  const verificarCodigo = useCallback(async (desafio: string, codigo: string): Promise<User> => {
+    const signedInUser = await verificarCodigoRequest(desafio, codigo);
     setUser(signedInUser);
     return signedInUser;
+  }, []);
+
+  const cambiarDosFactores = useCallback(
+    async (activo: boolean, password: string): Promise<ConfirmacionPendiente | null> => {
+      const resultado = await cambiarDosFactoresRequest(activo, password);
+      if ('user' in resultado) {
+        setUser(resultado.user);
+        return null;
+      }
+      return resultado;
+    },
+    [],
+  );
+
+  const confirmarDosFactores = useCallback(async (desafio: string, codigo: string): Promise<void> => {
+    setUser(await confirmarDosFactoresRequest(desafio, codigo));
   }, []);
 
   const register = useCallback(async (data: RegisterData): Promise<User> => {
@@ -68,15 +85,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const value = useMemo<AuthContextType>(
-    () => ({ user, isAuthenticated: user !== null, isLoading, login, register, actualizarPerfil, logout }),
-    [user, isLoading, login, register, actualizarPerfil, logout],
+    () => ({
+      user, isAuthenticated: user !== null, isLoading, login, verificarCodigo, cambiarDosFactores, confirmarDosFactores,
+      register, actualizarPerfil, logout,
+    }),
+    [user, isLoading, login, verificarCodigo, cambiarDosFactores, confirmarDosFactores, register, actualizarPerfil, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) throw new Error('useAuth debe usarse dentro de un AuthProvider');
-  return context;
 };

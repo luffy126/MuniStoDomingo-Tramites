@@ -5,22 +5,39 @@ export type Tema = 'claro' | 'oscuro';
 const CLAVE_TEMA = 'muni-tema';
 const oyentes = new Set<() => void>();
 
-/** Preferencia guardada; si no hay, se usa la del sistema. */
+/**
+ * Preferencia guardada; por defecto modo claro.
+ *
+ * El tema no se deduce del sistema: el usuario lo cambia a mano desde el botón
+ * del header o el interruptor de Perfil/menú. Así el portal siempre abre con la
+ * misma apariencia institucional sin importar la configuración del dispositivo.
+ */
 const leerTemaInicial = (): Tema => {
   try {
     const guardado = localStorage.getItem(CLAVE_TEMA);
     if (guardado === 'claro' || guardado === 'oscuro') return guardado;
   } catch {
-    // Sin acceso a localStorage (modo privado): se sigue con el sistema.
+    // Sin acceso a localStorage (modo privado): se abre en claro.
   }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
+  return 'claro';
 };
 
 let temaActual: Tema = leerTemaInicial();
 
-/** Ionic activa su paleta oscura con la clase ion-palette-dark en <html>. */
+/**
+ * Ionic activa su paleta oscura con la clase `ion-palette-dark` en `<html>`.
+ *
+ * `shell-oscuro` es la misma señal para el shell inline de `index.html` (fondo
+ * de `body` y de la tarjeta de carga), de modo que el primer paint ya coincide
+ * con la elección guardada y no hay destello claro en modo oscuro.
+ */
 const aplicarTema = (tema: Tema): void => {
-  document.documentElement.classList.toggle('ion-palette-dark', tema === 'oscuro');
+  const oscuro = tema === 'oscuro';
+  document.documentElement.classList.toggle('ion-palette-dark', oscuro);
+  document.documentElement.classList.toggle('shell-oscuro', oscuro);
+
+  const metaColor = document.querySelector('meta[name="color-scheme"]');
+  if (metaColor !== null) metaColor.setAttribute('content', oscuro ? 'dark' : 'light');
 };
 
 aplicarTema(temaActual);

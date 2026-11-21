@@ -7,7 +7,8 @@ const ingresar = (email: string, password: string): void => {
 
 describe('Rutas y pantallas principales', () => {
   beforeEach(() => {
-    cy.clearLocalStorage();
+    cy.visit('/login');
+    cy.cerrarSesion();
   });
 
   it('redirige a login cuando no hay sesión', () => {
