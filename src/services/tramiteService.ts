@@ -1,12 +1,22 @@
 import { RowDataPacket } from 'mysql2';
 import pool from '../config/database';
-import { TramiteConRequisitos, TramiteDB } from '../types';
+import { RequisitoDetalle, TramiteConRequisitos, TramiteDB } from '../types';
 
 /** Fila de la consulta de requisitos agrupados. */
 interface FilaRequisito extends RowDataPacket {
+  id: number;
   tramite_id: string;
   descripcion: string;
+  tipo: 'documento' | 'dato';
+  obligatorio: number | boolean;
 }
+
+const aDetalle = (fila: FilaRequisito): RequisitoDetalle => ({
+  id: String(fila.id),
+  descripcion: fila.descripcion,
+  tipo: fila.tipo === 'dato' ? 'dato' : 'documento',
+  obligatorio: Boolean(fila.obligatorio),
+});
 
 /** Fila de la consulta de trámites. */
 interface FilaTramite extends RowDataPacket, TramiteDB {}
@@ -23,13 +33,13 @@ export async function getAll(): Promise<TramiteConRequisitos[]> {
   );
 
   const [requisitos] = await pool.execute<FilaRequisito[]>(
-    'SELECT tramite_id, descripcion FROM requisito ORDER BY tramite_id ASC, orden ASC'
+    'SELECT id, tramite_id, descripcion, tipo, obligatorio FROM requisito ORDER BY tramite_id ASC, orden ASC, id ASC'
   );
 
-  const requisitosPorTramite = new Map<string, string[]>();
+  const requisitosPorTramite = new Map<string, RequisitoDetalle[]>();
   for (const requisito of requisitos) {
     const lista = requisitosPorTramite.get(requisito.tramite_id) ?? [];
-    lista.push(requisito.descripcion);
+    lista.push(aDetalle(requisito));
     requisitosPorTramite.set(requisito.tramite_id, lista);
   }
 
@@ -39,7 +49,8 @@ export async function getAll(): Promise<TramiteConRequisitos[]> {
     categoria: tramite.categoria,
     descripcion: tramite.descripcion,
     icono: tramite.icono,
-    requisitos: requisitosPorTramite.get(tramite.id) ?? [],
+    requisitos: (requisitosPorTramite.get(tramite.id) ?? []).map((r) => r.descripcion),
+    requisitosDetalle: requisitosPorTramite.get(tramite.id) ?? [],
   }));
 }
 
@@ -74,7 +85,7 @@ export async function getByIdWithRequisitos(id: string): Promise<TramiteConRequi
   }
 
   const [requisitos] = await pool.execute<FilaRequisito[]>(
-    'SELECT tramite_id, descripcion FROM requisito WHERE tramite_id = ? ORDER BY orden ASC',
+    'SELECT id, tramite_id, descripcion, tipo, obligatorio FROM requisito WHERE tramite_id = ? ORDER BY orden ASC, id ASC',
     [id]
   );
 
@@ -85,5 +96,6 @@ export async function getByIdWithRequisitos(id: string): Promise<TramiteConRequi
     descripcion: tramite.descripcion,
     icono: tramite.icono,
     requisitos: requisitos.map((requisito) => requisito.descripcion),
+    requisitosDetalle: requisitos.map(aDetalle),
   };
 }

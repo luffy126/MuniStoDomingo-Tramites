@@ -33,10 +33,17 @@ const REMITENTE_POR_DEFECTO = 'MuniStoDomingo <onboarding@resend.dev>';
 /** En las pruebas automáticas no se ensucia la salida con los correos simulados. */
 const silencioso = process.env.NODE_ENV === 'test';
 
+const redactarToken = (texto: string): string =>
+  texto.replace(/(token=)[^\s&]+/gi, '$1***');
+
 const dryRunSender: EmailSender = async (email) => {
   if (!silencioso) {
     console.log(`📧 [DRY RUN] Email a ${email.to}: ${email.subject}`);
-    console.log(`   ${email.text.replace(/\n+/g, ' | ')}`);
+    console.log(`   ${redactarToken(email.text).replace(/\n+/g, ' | ')}`);
+    // Solo para QA local explícito: nunca en producción ni por defecto.
+    if (process.env.MOSTRAR_TOKEN_RECUPERACION === '1') {
+      console.log(`   [QA] ${email.text.replace(/\n+/g, ' | ')}`);
+    }
   }
   return true;
 };
@@ -187,4 +194,94 @@ export function construirEmailEstado(aviso: AvisoEstado): Email {
 /** Envía al vecino el aviso de que su solicitud cambió de estado. Nunca lanza. */
 export async function enviarNotificacionEstado(aviso: AvisoEstado): Promise<boolean> {
   return sendEmail(construirEmailEstado(aviso));
+}
+
+export interface Recuperacion {
+  destinatario: string;
+  nombre: string;
+  enlace: string;
+  minutosVigencia: number;
+}
+
+/** Arma el correo de recuperación. Separado del envío para poder probarlo sin red. */
+export function construirEmailRecuperacion(datos: Recuperacion): Email {
+  const enlace = datos.enlace.replace(/[\r\n]+/g, '');
+  const html = `
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1f2a37;">
+  <div style="background:#0d1f61;color:#ffffff;padding:20px;border-radius:8px 8px 0 0;border-bottom:4px solid #d32f2f;text-align:center;">
+    <h1 style="margin:0;font-size:20px;">Municipalidad de Santo Domingo</h1>
+    <p style="margin:4px 0 0;font-size:14px;">Sistema de Trámites en Línea</p>
+  </div>
+  <div style="border:1px solid #dde3e8;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+    <h2 style="color:#0d1f61;margin:0 0 12px;font-size:18px;">Recupera tu contraseña</h2>
+    <p>Hola, ${escapeHtml(datos.nombre)}:</p>
+    <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta. El enlace vence en ${datos.minutosVigencia} minutos y se puede usar una sola vez.</p>
+    <p style="text-align:center;margin:24px 0;">
+      <a href="${escapeHtml(enlace)}" style="display:inline-block;padding:12px 24px;background:#0d1f61;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;">Crear nueva contraseña</a>
+    </p>
+    <p style="font-size:13px;color:#4f5655;">Si el botón no funciona, copia este enlace en tu navegador:<br>${escapeHtml(enlace)}</p>
+    <p style="font-size:13px;color:#4f5655;">Si no pediste este cambio, ignora el correo. Tu contraseña actual seguirá funcionando.</p>
+    <hr style="border:none;border-top:1px solid #dde3e8;margin:24px 0;">
+    <p style="color:#4f5655;font-size:13px;text-align:center;margin:0;">
+      Este es un correo automático del Sistema de Trámites de la Municipalidad de Santo Domingo. Por favor, no respondas a este mensaje.
+    </p>
+  </div>
+</div>`.trim();
+
+  const text = [
+    `Hola, ${datos.nombre}:`,
+    `Recibimos una solicitud para restablecer la contraseña de tu cuenta. El enlace vence en ${datos.minutosVigencia} minutos y se puede usar una sola vez:`,
+    enlace,
+    'Si no pediste este cambio, ignora el correo. Tu contraseña actual seguirá funcionando.',
+    'Este es un correo automático de la Municipalidad de Santo Domingo. Por favor, no respondas a este mensaje.',
+  ].join('\n\n');
+
+  return {
+    to: datos.destinatario,
+    subject: 'Recupera tu contraseña · Trámites Santo Domingo',
+    html,
+    text,
+  };
+}
+
+export interface CodigoAcceso {
+  destinatario: string;
+  nombre: string;
+  codigo: string;
+  minutosVigencia: number;
+}
+
+/** Arma el correo con el código de verificación en dos pasos. */
+export function construirEmailCodigo(datos: CodigoAcceso): Email {
+  const codigo = datos.codigo.replace(/\D/g, '');
+  const html = `
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1f2a37;">
+  <div style="background:#0d1f61;color:#ffffff;padding:20px;border-radius:8px 8px 0 0;border-bottom:4px solid #d32f2f;text-align:center;">
+    <h1 style="margin:0;font-size:20px;">Municipalidad de Santo Domingo</h1>
+    <p style="margin:4px 0 0;font-size:14px;">Sistema de Trámites en Línea</p>
+  </div>
+  <div style="border:1px solid #dde3e8;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+    <h2 style="color:#0d1f61;margin:0 0 12px;font-size:18px;">Tu código de acceso</h2>
+    <p>Hola, ${escapeHtml(datos.nombre)}:</p>
+    <p>Usa este código para terminar de ingresar. Vence en ${datos.minutosVigencia} minutos.</p>
+    <p style="text-align:center;margin:24px 0;font-size:32px;letter-spacing:8px;font-weight:bold;color:#0d1f61;">${codigo}</p>
+    <p style="font-size:13px;color:#4f5655;">Si no intentaste ingresar, alguien conoce tu contraseña: cámbiala desde "¿Olvidaste tu contraseña?".</p>
+  </div>
+</div>`.trim();
+  const text = [
+    `Hola, ${datos.nombre}:`,
+    `Tu código de acceso es ${codigo}. Vence en ${datos.minutosVigencia} minutos.`,
+    'Si no intentaste ingresar, alguien conoce tu contraseña: cámbiala desde "¿Olvidaste tu contraseña?".',
+  ].join('\n\n');
+  return { to: datos.destinatario, subject: 'Tu código de acceso · Trámites Santo Domingo', html, text };
+}
+
+/** Envía el código de verificación en dos pasos. Nunca lanza. */
+export async function enviarCodigoAcceso(datos: CodigoAcceso): Promise<boolean> {
+  return sendEmail(construirEmailCodigo(datos));
+}
+
+/** Envía el enlace de recuperación. Nunca lanza. */
+export async function enviarRecuperacion(datos: Recuperacion): Promise<boolean> {
+  return sendEmail(construirEmailRecuperacion(datos));
 }

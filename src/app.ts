@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import { authLimiter, generalLimiter } from './middleware/rateLimiter';
+import compression from 'compression';
+import { generalLimiter } from './middleware/rateLimiter';
 import tramiteRoutes from './routes/tramiteRoutes';
 import solicitudRoutes from './routes/solicitudRoutes';
 import notificacionRoutes from './routes/notificacionRoutes';
@@ -21,11 +23,28 @@ if (process.env.TRUST_PROXY) {
 }
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:8100',
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
+}));
+// JSON y respuestas de la API viajan comprimidas; no toca las descargas de archivos.
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.path.includes('/documentos/') && req.path.includes('/descarga')) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
 }));
 app.use(express.json({ limit: '16kb' }));
 app.use(generalLimiter);
+
+// ── Respuestas con datos personales: nunca se cachean ──
+// El catálogo público (/api/tramites) queda fuera: puede cachearse.
+const noStore = (_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+};
 
 // ── Ruta de health check ─────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -33,10 +52,10 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ── Montar rutas ─────────────────────────────────
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', noStore, authRoutes);
 app.use('/api/tramites', tramiteRoutes);
-app.use('/api/solicitudes', solicitudRoutes);
-app.use('/api/notificaciones', notificacionRoutes);
+app.use('/api/solicitudes', noStore, solicitudRoutes);
+app.use('/api/notificaciones', noStore, notificacionRoutes);
 // El endpoint de reportes se monta dentro de solicitudRoutes (/api/solicitudes/reportes)
 
 // ── Ruta no encontrada ───────────────────────────

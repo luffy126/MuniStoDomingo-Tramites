@@ -27,6 +27,23 @@ export const listarNotificaciones = async (
 };
 
 /**
+ * PATCH /api/notificaciones/leidas
+ * Marca todas las notificaciones del usuario como leídas.
+ */
+export const marcarTodasLeidas = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const actualizadas = await notificacionService.markAllAsRead(req.user!.id);
+    res.status(200).json({ success: true, data: { actualizadas } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * PATCH /api/notificaciones/:id
  * Marca una notificación como leída y devuelve la notificación actualizada.
  */
