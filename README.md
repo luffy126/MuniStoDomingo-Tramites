@@ -9,6 +9,7 @@ Aplicación móvil y web para que los vecinos de la **Municipalidad de Santo Dom
 | Simón Ledezma | Frontend + organización |
 | Tomás Monge | Setup proyecto + Figma Movil |
 | Francisco Espinoza | Figma Web + Debugging |
+| Melissa Rojas | QA Analyst + Postman en APIs |
 
 ## Distribución de responsabilidades
 
