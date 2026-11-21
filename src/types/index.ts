@@ -9,6 +9,7 @@
 export type Rol = 'vecino' | 'funcionario';
 export type CategoriaTramite = 'certificados' | 'permisos' | 'reclamos' | 'solicitudes';
 export type EstadoSolicitud = 'pendiente' | 'en_revision' | 'aprobado' | 'rechazado';
+export type PrioridadSolicitud = 'baja' | 'media' | 'alta' | 'urgente';
 
 // --- Usuario ---
 
@@ -19,6 +20,11 @@ export interface UsuarioDB {
   email: string;
   password_hash: string;
   rol: Rol;
+  telefono: string | null;
+  direccion: string | null;
+  token_version: number;
+  /** Verificación en dos pasos por correo activa. MySQL la devuelve como 0/1. */
+  dos_factores: boolean | number;
   creado_en: Date;
 }
 
@@ -28,6 +34,13 @@ export interface UsuarioPublico {
   nombre: string;
   email: string;
   rol: Rol;
+  telefono: string | null;
+  direccion: string | null;
+}
+
+/** Usuario público más la versión de sesión con que se firman sus tokens. */
+export interface UsuarioSesion extends UsuarioPublico {
+  token_version: number;
 }
 
 // --- Trámite ---
@@ -56,6 +69,15 @@ export interface TramiteConRequisitos {
   descripcion: string;
   icono: string;
   requisitos: string[];
+  /** Los mismos requisitos con su tipo: los de tipo 'documento' se adjuntan al iniciar. */
+  requisitosDetalle: RequisitoDetalle[];
+}
+
+export interface RequisitoDetalle {
+  id: string;
+  descripcion: string;
+  tipo: 'documento' | 'dato';
+  obligatorio: boolean;
 }
 
 // --- Solicitud ---
@@ -67,19 +89,37 @@ export interface SolicitudDB {
   vecino_id: number;
   funcionario_id: number | null;
   estado: EstadoSolicitud;
+  prioridad: PrioridadSolicitud;
+  fecha_limite: Date | null;
   observaciones: string | null;
   creada_en: Date;
   resuelta_en: Date | null;
+}
+
+/** Evento de la línea de tiempo de una solicitud. */
+export interface EventoHistorial {
+  id: string;
+  estadoAnterior: EstadoSolicitud | 'cancelada' | null;
+  estadoNuevo: EstadoSolicitud | 'cancelada';
+  actorNombre: string;
+  observaciones?: string;
+  fecha: string;
 }
 
 /** Solicitud mapeada al formato del frontend. `id` es el folio, no el id numérico. */
 export interface SolicitudFrontend {
   id: string;
   tramiteId: string;
+  tramiteNombre: string;
   vecinoNombre: string;
   fecha: string;
   estado: EstadoSolicitud;
+  prioridad: PrioridadSolicitud;
+  fechaLimite?: string;
+  fechaResolucion?: string;
   observaciones?: string;
+  /** Solo en el detalle. */
+  historial?: EventoHistorial[];
 }
 
 // --- Notificación ---
@@ -101,6 +141,35 @@ export interface NotificacionFrontend {
   mensaje: string;
   fecha: string;
   leida: boolean;
+  /** Folio de la solicitud relacionada, para navegar al detalle. */
+  folio?: string;
+}
+
+// --- Documentos ---
+
+export interface DocumentoDB {
+  id: number;
+  solicitud_id: number;
+  subido_por: number | null;
+  nombre_original: string;
+  nombre_almacenado: string;
+  tipo: string;
+  tamano: number;
+  requisito_id: number | null;
+  creado_en: Date;
+}
+
+/** Documento adjunto mapeado al formato del frontend. */
+export interface DocumentoSolicitud {
+  id: string;
+  nombre: string;
+  tipo: string;
+  tamano: number;
+  fecha: string;
+  subidoPor: string | null;
+  /** Requisito que cumple, si se adjuntó para uno. */
+  requisitoId?: string;
+  requisito?: string;
 }
 
 // --- Reportes ---
@@ -110,6 +179,25 @@ export interface ResumenPorEstado {
   en_revision: number;
   aprobado: number;
   rechazado: number;
+  vencidas: number;
+  promedioResolucionDias: number | null;
+}
+
+export interface GrupoReporte {
+  clave: string;
+  etiqueta: string;
+  total: number;
+}
+
+export interface ReporteSolicitudes {
+  desde: string | null;
+  hasta: string | null;
+  total: number;
+  porEstado: ResumenPorEstado;
+  porTramite: GrupoReporte[];
+  porPrioridad: GrupoReporte[];
+  vencidas: number;
+  promedioResolucionDias: number | null;
 }
 
 /**
@@ -125,4 +213,12 @@ export function formatearFecha(valor: Date | string): string {
   const mes = String(fecha.getMonth() + 1).padStart(2, '0');
   const dia = String(fecha.getDate()).padStart(2, '0');
   return `${anio}-${mes}-${dia}`;
+}
+
+/** Igual que `formatearFecha`, pero conserva la hora local para la línea de tiempo. */
+export function formatearFechaHora(valor: Date | string): string {
+  const fecha = valor instanceof Date ? valor : new Date(valor);
+  const hora = String(fecha.getHours()).padStart(2, '0');
+  const minuto = String(fecha.getMinutes()).padStart(2, '0');
+  return `${formatearFecha(fecha)}T${hora}:${minuto}:00`;
 }

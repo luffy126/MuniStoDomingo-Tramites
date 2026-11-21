@@ -10,8 +10,10 @@ import {
   limitOffset,
 } from '../utils/pagination';
 
-/** Fila de la tabla notificacion. */
-interface FilaNotificacion extends RowDataPacket, NotificacionDB {}
+/** Fila de la tabla notificacion, con el folio de la solicitud si existe. */
+interface FilaNotificacion extends RowDataPacket, NotificacionDB {
+  solicitud_folio: string | null;
+}
 
 /**
  * Traduce una fila de la base de datos al formato del frontend.
@@ -26,6 +28,7 @@ function toFrontend(fila: FilaNotificacion): NotificacionFrontend {
     mensaje: fila.mensaje,
     fecha: formatearFecha(fila.creada_en),
     leida: Boolean(fila.leida),
+    ...(fila.solicitud_folio !== null ? { folio: fila.solicitud_folio } : {}),
   };
 }
 
@@ -91,7 +94,13 @@ export async function getByUsuario(
   );
 
   const [rows] = await pool.execute<FilaNotificacion[]>(
-    'SELECT id, usuario_id, solicitud_id, titulo, mensaje, leida, creada_en FROM notificacion WHERE usuario_id = ? ORDER BY creada_en DESC, id DESC LIMIT ? OFFSET ?',
+    `SELECT n.id, n.usuario_id, n.solicitud_id, n.titulo, n.mensaje, n.leida, n.creada_en,
+            s.folio AS solicitud_folio
+     FROM notificacion n
+     LEFT JOIN solicitud s ON s.id = n.solicitud_id
+     WHERE n.usuario_id = ?
+     ORDER BY n.creada_en DESC, n.id DESC
+     LIMIT ? OFFSET ?`,
     [usuarioId, ...limitOffset(pagination)]
   );
 
@@ -118,8 +127,25 @@ export async function markAsRead(id: number, usuarioId: number): Promise<Notific
   );
 
   const [rows] = await pool.execute<FilaNotificacion[]>(
-    'SELECT id, usuario_id, solicitud_id, titulo, mensaje, leida, creada_en FROM notificacion WHERE id = ? AND usuario_id = ?',
+    `SELECT n.id, n.usuario_id, n.solicitud_id, n.titulo, n.mensaje, n.leida, n.creada_en,
+            s.folio AS solicitud_folio
+     FROM notificacion n
+     LEFT JOIN solicitud s ON s.id = n.solicitud_id
+     WHERE n.id = ? AND n.usuario_id = ?`,
     [id, usuarioId]
   );
   return rows.length === 0 ? null : toFrontend(rows[0]);
+}
+
+/**
+ * Marca como leídas todas las notificaciones pendientes de un usuario.
+ *
+ * @returns Cantidad de avisos que cambiaron de estado.
+ */
+export async function markAllAsRead(usuarioId: number): Promise<number> {
+  const [result] = await pool.execute<ResultSetHeader>(
+    'UPDATE notificacion SET leida = TRUE WHERE usuario_id = ? AND leida = FALSE',
+    [usuarioId]
+  );
+  return result.affectedRows;
 }

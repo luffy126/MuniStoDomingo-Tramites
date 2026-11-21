@@ -27,6 +27,7 @@ está en la rama `frontend`.
 - bcrypt para hash de contraseñas
 - express-validator para validación de inputs
 - cors para Cross-Origin Resource Sharing
+- compression para gzip de respuestas JSON (umbral 1 kB; no comprime adjuntos)
 - dotenv para variables de entorno
 
 ## Puesta en marcha
@@ -50,6 +51,15 @@ tiene contraseña. También se puede importar `schema.sql` desde phpMyAdmin
 `schema.sql` crea las cinco tablas y carga datos semilla, de modo que el sistema queda
 utilizable apenas se levanta. Se puede volver a ejecutar para reiniciar los datos a la
 semilla (borra y recrea las tablas con `DROP TABLE IF EXISTS`; la base no se elimina).
+
+Para una base que ya exista, aplicar las migraciones idempotentes en orden:
+
+```bash
+mysql -u root --default-character-set=utf8mb4 muni_stodomingo < migrations/2026-11-18_mejoras.sql
+mysql -u root --default-character-set=utf8mb4 muni_stodomingo < migrations/2026-11-19_rendimiento.sql
+```
+
+La segunda agrega índices para listados, reportes y notificaciones; se puede repetir sin error.
 
 ### 2. Backend
 
@@ -157,8 +167,13 @@ Evidencia de ejecución:
 | `PORT` | Puerto del servidor | `3000` |
 | `NODE_ENV` | En `development` el detalle y el stack de los errores 500 solo se escriben en la consola del servidor; nunca se envían al cliente | `development` |
 | `FRONTEND_URL` | Origen permitido por CORS | `http://localhost:5173` si el front corre con Vite (`npm run dev`), `http://localhost:8100` con `ionic serve` |
+| `AUTH_RATE_LIMIT_MAX` | Intentos por IP cada 15 minutos en login, registro y recuperación | `10` (seguro); subirlo solo en desarrollo para el suite E2E |
+| `GENERAL_RATE_LIMIT_MAX` | Peticiones por IP y minuto antes de procesar cualquier ruta | `100` (seguro); subirlo solo en desarrollo para el suite E2E |
 
-El archivo `.env` nunca se sube al repositorio; `.env.example` documenta las claves.
+El archivo `.env` nunca se sube al repositorio; `.env.example` documenta las claves. Los límites
+de peticiones son configurables solo para desarrollo: los valores por defecto (10 y 100) son los
+que deben quedar en producción. El suite E2E del frontend necesita más margen porque inicia
+sesión varias veces y hace muchas peticiones en menos de un minuto.
 
 ## Arquitectura
 

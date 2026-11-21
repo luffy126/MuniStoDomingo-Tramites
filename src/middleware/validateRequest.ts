@@ -70,8 +70,75 @@ export const validateRegister = [
 
 export const validateLogin = [emailRule(), passwordRule(), handleValidationErrors];
 
-/** PUT /api/auth/me: reemplaza nombre y email del usuario de la sesión. */
-export const validateUpdateProfile = [nombreRule(), emailRule(), handleValidationErrors];
+export const validateForgotPassword = [emailRule(), handleValidationErrors];
+
+export const validateResetPassword = [
+  body('token')
+    .isString().withMessage('El enlace no es válido').bail()
+    .trim()
+    .matches(/^[a-f0-9]{64}$/i).withMessage('El enlace no es válido'),
+  passwordRule()
+    .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+    .matches(/[A-Z]/).withMessage('La contraseña debe contener al menos una letra mayúscula')
+    .matches(/[a-z]/).withMessage('La contraseña debe contener al menos una letra minúscula')
+    .matches(/\d/).withMessage('La contraseña debe contener al menos un número')
+    .custom((value: string) => Buffer.byteLength(value, 'utf8') <= 72)
+    .withMessage('La contraseña no puede superar 72 bytes'),
+  handleValidationErrors,
+];
+
+/** POST /api/auth/2fa/verificar */
+export const validateVerificar2fa = [
+  body('desafio')
+    .isString().withMessage('Vuelve a ingresar con tu contraseña').bail()
+    .matches(/^[a-f0-9]{64}$/).withMessage('Vuelve a ingresar con tu contraseña'),
+  body('codigo')
+    .isString().withMessage('Ingresa el código de 6 dígitos').bail()
+    .trim()
+    .matches(/^\d{6}$/).withMessage('El código tiene 6 dígitos'),
+  handleValidationErrors,
+];
+
+/** PUT /api/auth/2fa */
+export const validateCambiar2fa = [
+  body('activo').isBoolean({ strict: true }).withMessage('activo debe ser true o false'),
+  passwordRule()
+    .custom((value: string) => Buffer.byteLength(value, 'utf8') <= 72)
+    .withMessage('La contraseña no puede superar 72 bytes'),
+  handleValidationErrors,
+];
+
+const telefonoRule = () => noHtmlTags(
+  body('telefono')
+    .optional({ values: 'falsy' })
+    .isString().withMessage('El teléfono debe ser texto').bail()
+    .trim()
+    .isLength({ max: 30 }).withMessage('El teléfono no puede superar 30 caracteres').bail()
+    .matches(/^[0-9+() -]+$/).withMessage('El teléfono solo puede tener números, espacios, +, paréntesis y guiones')
+);
+
+const direccionRule = () => noHtmlTags(
+  body('direccion')
+    .optional({ values: 'falsy' })
+    .isString().withMessage('La dirección debe ser texto').bail()
+    .trim()
+    .isLength({ max: 255 }).withMessage('La dirección no puede superar 255 caracteres')
+);
+
+/** PUT /api/auth/me: reemplaza nombre, email y datos de contacto del usuario de la sesión. */
+export const validateUpdateProfile = [
+  nombreRule(),
+  emailRule(),
+  telefonoRule(),
+  direccionRule(),
+  // Solo se exige al cambiar el email; el controlador la compara con el hash.
+  body('passwordActual')
+    .optional()
+    .isString().withMessage('La contraseña actual debe ser texto').bail()
+    .custom((value: string) => Buffer.byteLength(value, 'utf8') <= 72)
+    .withMessage('La contraseña no puede superar 72 bytes'),
+  handleValidationErrors,
+];
 
 /** POST /api/solicitudes: trámite requerido y observaciones opcionales de texto plano. */
 export const validateCrearSolicitud = [

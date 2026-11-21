@@ -31,6 +31,10 @@
 
 Además, Express tiene deshabilitado `X-Powered-By`.
 
+La compresión gzip se negocia con `Accept-Encoding` y añade ese encabezado a `Vary`. No cambia las reglas de caché: las respuestas autenticadas y los documentos siguen con sus cabeceras `no-store`/`private` correspondientes, y las descargas de adjuntos quedan fuera del middleware de compresión.
+
+El cliente guarda en memoria, durante 5 minutos, solo el catálogo público de trámites (`GET /api/tramites`) para no repetirlo al cambiar de pestaña. Esa caché no contiene solicitudes, notificaciones, datos de vecinos ni respuestas autenticadas, y desaparece al recargar la página. El service worker sigue limitado al shell y `/api/` permanece como network-only.
+
 ### HTTPS y despliegue detrás de un proxy
 
 HSTS indica al navegador que use HTTPS en conexiones posteriores a un acceso HTTPS válido. **No redirige la primera petición HTTP ni convierte el servidor Express en un servidor TLS.** El despliegue público debe terminar TLS y redirigir HTTP a HTTPS en el proxy o balanceador.
