@@ -2,7 +2,7 @@ import { rutaInicialPorRol } from '../services/authService';
 import type { User } from '../services/authService';
 
 /** Páginas reales de cada área. Cualquier otra ruta del área redirige a la principal. */
-const PAGINAS_VECINO = [/^\/vecino\/dashboard$/, /^\/vecino\/mis-tramites$/, /^\/vecino\/notificaciones$/, /^\/vecino\/perfil$/, /^\/vecino\/tramite\/[^/]+$/];
+const PAGINAS_VECINO = [/^\/vecino\/dashboard$/, /^\/vecino\/mis-tramites$/, /^\/vecino\/mis-tramites\/[^/]+$/, /^\/vecino\/notificaciones$/, /^\/vecino\/perfil$/, /^\/vecino\/tramite\/[^/]+$/];
 const PAGINAS_FUNCIONARIO = [/^\/funcionario\/solicitudes$/, /^\/funcionario\/reportes$/, /^\/funcionario\/solicitud\/[^/]+$/];
 
 /**
@@ -20,6 +20,8 @@ export const rutaDeArranque = (pathname: string, user: User | null): string | nu
   const ruta = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
   const inicio = user === null ? '/login' : rutaInicialPorRol(user.rol);
 
+  // Páginas públicas: se abren con o sin sesión (el enlace de recuperación llega por correo).
+  if (ruta === '/recuperar-password' || ruta === '/terminos') return null;
   if (ruta === '/login' || ruta === '/register') return user === null ? null : inicio;
 
   const area = ruta.startsWith('/vecino') ? 'vecino' : ruta.startsWith('/funcionario') ? 'funcionario' : null;

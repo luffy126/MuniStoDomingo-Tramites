@@ -8,6 +8,8 @@ export interface User {
   nombre: string;
   email: string;
   rol: Rol;
+  telefono?: string | null;
+  direccion?: string | null;
 }
 
 export interface RegisterData {
@@ -20,6 +22,10 @@ export interface RegisterData {
 export interface PerfilData {
   nombre: string;
   email: string;
+  telefono?: string | null;
+  direccion?: string | null;
+  /** Obligatoria solo si cambia el email: el backend la exige para confirmar la identidad. */
+  passwordActual?: string;
 }
 
 interface BackendUser {
@@ -27,6 +33,8 @@ interface BackendUser {
   nombre: string;
   email: string;
   rol: Rol;
+  telefono?: string | null;
+  direccion?: string | null;
 }
 
 interface AuthResponse {
@@ -42,7 +50,12 @@ const getStorage = (): Storage | null => {
   }
 };
 
-const adaptarUser = (user: BackendUser): User => ({ ...user, id: String(user.id) });
+const adaptarUser = (user: BackendUser): User => ({
+  ...user,
+  id: String(user.id),
+  telefono: user.telefono ?? null,
+  direccion: user.direccion ?? null,
+});
 
 /**
  * La sesión se guarda en localStorage (lectura síncrona en cada petición) y se
@@ -74,8 +87,67 @@ export const limpiarSesion = (): void => {
   void storageService.remove(TOKEN_KEY);
 };
 
-export const loginRequest = async (email: string, password: string): Promise<User> => {
-  const response = await apiClient.post<AuthResponse>('/api/auth/login', { email, password });
+/** El login entrega la sesión, o pide el código de 2FA que se envió por correo. */
+export type ResultadoLogin =
+  | { tipo: 'sesion'; user: User }
+  | { tipo: '2fa'; desafio: string; destino: string };
+
+interface Respuesta2FA {
+  requiere2fa: true;
+  desafio: string;
+  destino: string;
+}
+
+export const loginRequest = async (email: string, password: string): Promise<ResultadoLogin> => {
+  const response = await apiClient.post<AuthResponse | Respuesta2FA>('/api/auth/login', { email, password });
+  if ('requiere2fa' in response && response.requiere2fa) {
+    return { tipo: '2fa', desafio: response.desafio, destino: response.destino };
+  }
+  const sesion = response as AuthResponse;
+  const user = adaptarUser(sesion.user);
+  guardarSesion(user, sesion.token);
+  return { tipo: 'sesion', user };
+};
+
+/** Segundo paso del login: el código de 6 dígitos que llegó por correo. */
+export const verificarCodigoRequest = async (desafio: string, codigo: string): Promise<User> => {
+  const response = await apiClient.post<AuthResponse>('/api/auth/2fa/verificar', { desafio, codigo });
+  const user = adaptarUser(response.user);
+  guardarSesion(user, response.token);
+  return user;
+};
+
+export const getEstadoDosFactores = async (): Promise<boolean> =>
+  (await apiClient.get<{ activo: boolean }>('/api/auth/2fa')).activo;
+
+/** Desafío pendiente al activar la 2FA: se confirma con el código enviado al correo. */
+export interface ConfirmacionPendiente {
+  desafio: string;
+  destino: string;
+}
+
+/**
+ * Activa o desactiva la 2FA. Activar no surte efecto todavía: devuelve el
+ * desafío y hay que confirmarlo con el código del correo. Desactivar es
+ * inmediato; el backend cierra las demás sesiones y reemite el token.
+ */
+export const cambiarDosFactoresRequest = async (
+  activo: boolean,
+  password: string
+): Promise<{ user: User } | ConfirmacionPendiente> => {
+  const response = await apiClient.put<(AuthResponse & { activo: boolean }) | (ConfirmacionPendiente & { requiereConfirmacion: true })>(
+    '/api/auth/2fa',
+    { activo, password },
+  );
+  if ('requiereConfirmacion' in response) return { desafio: response.desafio, destino: response.destino };
+  const user = adaptarUser(response.user);
+  guardarSesion(user, response.token);
+  return { user };
+};
+
+/** Termina de activar la 2FA con el código que llegó al correo. */
+export const confirmarDosFactoresRequest = async (desafio: string, codigo: string): Promise<User> => {
+  const response = await apiClient.post<AuthResponse>('/api/auth/2fa/confirmar', { desafio, codigo });
   const user = adaptarUser(response.user);
   guardarSesion(user, response.token);
   return user;
@@ -96,11 +168,29 @@ export const actualizarPerfilRequest = async (data: PerfilData): Promise<User> =
   const response = await apiClient.put<AuthResponse>('/api/auth/me', {
     nombre: data.nombre.trim(),
     email: data.email.trim().toLowerCase(),
+    telefono: data.telefono?.trim() || null,
+    direccion: data.direccion?.trim() || null,
+    ...(data.passwordActual ? { passwordActual: data.passwordActual } : {}),
   });
   // El backend reemite el token porque el email viaja en sus claims.
   const user = adaptarUser(response.user);
   guardarSesion(user, response.token);
   return user;
+};
+
+export const solicitarRecuperacion = async (email: string): Promise<string> => {
+  const respuesta = await apiClient.post<{ mensaje: string }>('/api/auth/forgot-password', {
+    email: email.trim().toLowerCase(),
+  });
+  return respuesta.mensaje;
+};
+
+export const restablecerPassword = async (token: string, password: string): Promise<string> => {
+  const respuesta = await apiClient.post<{ mensaje: string }>('/api/auth/reset-password', {
+    token,
+    password,
+  });
+  return respuesta.mensaje;
 };
 
 /** Lee el token de localStorage y, si no está, del respaldo en IndexedDB. */

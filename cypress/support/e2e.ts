@@ -16,5 +16,11 @@
 // Import commands.js using ES2015 syntax:
 import './commands'
 
+afterEach(() => {
+  // La app respalda la sesión en IndexedDB; sin cerrar sesión de verdad, la
+  // siguiente prueba entra autenticada aunque haya borrado localStorage.
+  cy.cerrarSesion();
+});
+
 // Alternatively you can use CommonJS syntax:
 // require('./commands')

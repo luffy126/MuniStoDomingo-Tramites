@@ -1,37 +1,29 @@
 /// <reference types="cypress" />
-// ***********************************************
-// This example commands.ts shows you how to
-// create various custom commands and overwrite
-// existing commands.
-//
-// For more comprehensive examples of custom
-// commands please read more here:
-// https://on.cypress.io/custom-commands
-// ***********************************************
-//
-//
-// -- This is a parent command --
-// Cypress.Commands.add('login', (email, password) => { ... })
-//
-//
-// -- This is a child command --
-// Cypress.Commands.add('drag', { prevSubject: 'element'}, (subject, options) => { ... })
-//
-//
-// -- This is a dual command --
-// Cypress.Commands.add('dismiss', { prevSubject: 'optional'}, (subject, options) => { ... })
-//
-//
-// -- This will overwrite an existing command --
-// Cypress.Commands.overwrite('visit', (originalFn, url, options) => { ... })
-//
-// declare global {
-//   namespace Cypress {
-//     interface Chainable {
-//       login(email: string, password: string): Chainable<void>
-//       drag(subject: string, options?: Partial<TypeOptions>): Chainable<Element>
-//       dismiss(subject: string, options?: Partial<TypeOptions>): Chainable<Element>
-//       visit(originalFn: CommandOriginalFn, url: string, options: Partial<VisitOptions>): Chainable<Element>
-//     }
-//   }
-// }
+
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      /**
+       * Limpia la sesión de la app, incluido el respaldo en IndexedDB.
+       * `cy.clearLocalStorage()` no alcanza ese respaldo y la siguiente prueba
+       * entraría autenticada. Se usa el storageService real de la app (Vite dev).
+       */
+      cerrarSesion(): Chainable<void>;
+    }
+  }
+}
+
+Cypress.Commands.add('cerrarSesion', () => {
+  cy.window({ log: false }).then(async (win) => {
+    win.localStorage.clear();
+    try {
+      const modulo = await win.eval("import('/src/services/storageService.ts')");
+      await modulo.default.remove('munisd.token');
+      await modulo.default.remove('munisd.sesion');
+    } catch {
+      // Si la página no es el dev server de Vite, al menos queda localStorage limpio.
+    }
+  });
+});
+
+export {};

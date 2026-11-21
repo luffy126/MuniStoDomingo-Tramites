@@ -20,7 +20,7 @@ const TramiteCard: React.FC<TramiteCardProps> = ({ tramite, onSeleccionar }) => 
   <IonCard button onClick={() => onSeleccionar(tramite)}>
     <IonCardHeader>
       <div className="tramite-card__encabezado">
-        <IonIcon icon={getIcono(tramite.icono)} color="primary" className="tramite-card__icono" />
+        <IonIcon icon={getIcono(tramite.icono)} color="primary" className="tramite-card__icono" aria-hidden="true" />
         <div>
           <IonCardTitle>{tramite.nombre}</IonCardTitle>
           <IonCardSubtitle>
