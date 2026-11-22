@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Vuelve a traer el código de las ramas backend y frontend a sus carpetas,
-# conservando los archivos de Docker (Dockerfile, .dockerignore, nginx.conf).
+# conservando los archivos de Docker (Dockerfile, .dockerignore, nginx.conf,
+# security-headers.conf).
 #
 # Uso:  ./sync.sh [ruta-al-repo] [rama-backend] [rama-frontend]
 #   ruta-al-repo   clon con acceso a origin (por defecto: este mismo directorio)
@@ -12,7 +13,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="${1:-$ROOT}"
 BACK_REF="${2:-origin/backend}"
 FRONT_REF="${3:-origin/frontend}"
-KEEP=(Dockerfile .dockerignore nginx.conf)
+KEEP=(Dockerfile .dockerignore nginx.conf security-headers.conf)
 
 # SKIP_FETCH=1 usa las refs locales tal como están
 [ -n "${SKIP_FETCH:-}" ] || git -C "$REPO" fetch origin --quiet

@@ -1,68 +1,178 @@
 /* For information on how to create your own theme, please refer to:
 http://ionicframework.com/docs/theming/ */
 
-/* Paleta institucional Municipalidad de Santo Domingo */
+/* Identidad "Comuna Parque" — Municipalidad de Santo Domingo (santodomingo.cl)
+   Azul marino institucional, azul del mar del escudo, rojo de la franja
+   "Comuna Parque" y verde parque para los estados aprobados. */
 :root {
-  --ion-color-primary: #1565c0;
-  --ion-color-primary-rgb: 21, 101, 192;
+  /* Tipografía del sitio oficial */
+  --ion-font-family: 'Montserrat', 'Segoe UI', Roboto, sans-serif;
+  --muni-font-titulos: 'Poppins', 'Montserrat', sans-serif;
+
+  /* Tokens propios de la marca */
+  --muni-azul-marino: #0d1f61;
+  --muni-azul-mar: #1e64b4;
+  --muni-rojo-franja: #d32f2f;
+  --muni-fondo: #f3f6f3;
+  --muni-superficie: #ffffff;
+  --muni-borde: #dde3e8;
+  --muni-texto: #1f2a37;
+  --muni-texto-suave: #4f5655;
+  --muni-radio: 14px;
+  --muni-sombra: 0 1px 2px rgba(13, 31, 97, 0.06), 0 4px 14px rgba(13, 31, 97, 0.07);
+
+  /* Material 3 — botones. Altura cómoda para pantallas táctiles, forma
+     completamente redondeada (equivalente al shape full de M3) y elevación 1.
+     Las capas de estado se explican en docs/PROGRESO_ESTETICA_BOTONES.md. */
+  --muni-boton-altura: 44px;
+  --muni-boton-altura-grande: 48px;
+  --muni-boton-radio: 22px;
+  --muni-boton-padding-x: 20px;
+  --muni-boton-padding-icono: 12px;
+  --muni-boton-sombra: 0 1px 2px rgba(13, 31, 97, 0.10), 0 2px 8px rgba(13, 31, 97, 0.10);
+  --muni-boton-sombra-hover: 0 2px 4px rgba(13, 31, 97, 0.12), 0 6px 16px rgba(13, 31, 97, 0.14);
+  --muni-estado-hover: rgba(13, 31, 97, 0.08);
+  --muni-estado-pulsado: rgba(13, 31, 97, 0.14);
+  --muni-estado-toolbar: rgba(255, 255, 255, 0.16);
+
+  --ion-color-primary: #0d1f61;
+  --ion-color-primary-rgb: 13, 31, 97;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #1259a9;
-  --ion-color-primary-tint: #2c74c6;
+  --ion-color-primary-shade: #0b1b55;
+  --ion-color-primary-tint: #253571;
 
-  --ion-color-secondary: #42a5f5;
-  --ion-color-secondary-rgb: 66, 165, 245;
+  --ion-color-secondary: #1e64b4;
+  --ion-color-secondary-rgb: 30, 100, 180;
   --ion-color-secondary-contrast: #ffffff;
   --ion-color-secondary-contrast-rgb: 255, 255, 255;
-  --ion-color-secondary-shade: #3a91d8;
-  --ion-color-secondary-tint: #55aef6;
+  --ion-color-secondary-shade: #1a589e;
+  --ion-color-secondary-tint: #3574bc;
 
-  --ion-color-tertiary: #5260ff;
-  --ion-color-tertiary-rgb: 82, 96, 255;
+  --ion-color-tertiary: #d32f2f;
+  --ion-color-tertiary-rgb: 211, 47, 47;
   --ion-color-tertiary-contrast: #ffffff;
   --ion-color-tertiary-contrast-rgb: 255, 255, 255;
-  --ion-color-tertiary-shade: #4854e0;
-  --ion-color-tertiary-tint: #6370ff;
+  --ion-color-tertiary-shade: #ba2929;
+  --ion-color-tertiary-tint: #d74444;
 
-  --ion-color-success: #2e7d32;
-  --ion-color-success-rgb: 46, 125, 50;
+  --ion-color-success: #2e7d4f;
+  --ion-color-success-rgb: 46, 125, 79;
   --ion-color-success-contrast: #ffffff;
   --ion-color-success-contrast-rgb: 255, 255, 255;
-  --ion-color-success-shade: #286e2c;
-  --ion-color-success-tint: #438c47;
+  --ion-color-success-shade: #286e46;
+  --ion-color-success-tint: #438a61;
 
-  --ion-color-warning: #f9a825;
-  --ion-color-warning-rgb: 249, 168, 37;
-  --ion-color-warning-contrast: #000000;
-  --ion-color-warning-contrast-rgb: 0, 0, 0;
-  --ion-color-warning-shade: #db9421;
-  --ion-color-warning-tint: #fab13a;
+  --ion-color-warning: #f2b705;
+  --ion-color-warning-rgb: 242, 183, 5;
+  --ion-color-warning-contrast: #1f2a37;
+  --ion-color-warning-contrast-rgb: 31, 42, 55;
+  --ion-color-warning-shade: #d5a104;
+  --ion-color-warning-tint: #f3be1e;
 
-  --ion-color-danger: #c62828;
-  --ion-color-danger-rgb: 198, 40, 40;
+  --ion-color-danger: #b42318;
+  --ion-color-danger-rgb: 180, 35, 24;
   --ion-color-danger-contrast: #ffffff;
   --ion-color-danger-contrast-rgb: 255, 255, 255;
-  --ion-color-danger-shade: #ae2323;
-  --ion-color-danger-tint: #cc3e3e;
+  --ion-color-danger-shade: #9e1f15;
+  --ion-color-danger-tint: #bc392f;
 
-  --ion-color-medium: #92949c;
-  --ion-color-medium-rgb: 146, 148, 156;
+  /* 5.31:1 sobre el fondo #f3f6f3 (el gris anterior daba 4.44:1). */
+  --ion-color-medium: #5f6673;
+  --ion-color-medium-rgb: 95, 102, 115;
   --ion-color-medium-contrast: #ffffff;
   --ion-color-medium-contrast-rgb: 255, 255, 255;
-  --ion-color-medium-shade: #808289;
-  --ion-color-medium-tint: #9d9fa6;
+  --ion-color-medium-shade: #545a65;
+  --ion-color-medium-tint: #6f7581;
 
-  --ion-color-light: #f4f5f8;
-  --ion-color-light-rgb: 244, 245, 248;
-  --ion-color-light-contrast: #000000;
-  --ion-color-light-contrast-rgb: 0, 0, 0;
-  --ion-color-light-shade: #d7d8da;
-  --ion-color-light-tint: #f5f6f9;
+  --ion-color-light: #f3f6f3;
+  --ion-color-light-rgb: 243, 246, 243;
+  --ion-color-light-contrast: #0d1f61;
+  --ion-color-light-contrast-rgb: 13, 31, 97;
+  --ion-color-light-shade: #d6d8d6;
+  --ion-color-light-tint: #f4f7f4;
 
-  --ion-color-dark: #222428;
-  --ion-color-dark-rgb: 34, 36, 40;
+  --ion-color-dark: #14261c;
+  --ion-color-dark-rgb: 20, 38, 28;
   --ion-color-dark-contrast: #ffffff;
   --ion-color-dark-contrast-rgb: 255, 255, 255;
-  --ion-color-dark-shade: #1e2023;
-  --ion-color-dark-tint: #383a3e;
+  --ion-color-dark-shade: #122119;
+  --ion-color-dark-tint: #2c3c33;
+
+  /* Fondo y texto generales (modo claro) */
+  --ion-background-color: var(--muni-fondo);
+  --ion-background-color-rgb: 243, 246, 243;
+  --ion-text-color: var(--muni-texto);
+  --ion-text-color-rgb: 31, 42, 55;
+  --ion-card-background: var(--muni-superficie);
+  --ion-item-background: var(--muni-superficie);
+  --ion-toolbar-background: var(--muni-superficie);
+  --ion-tab-bar-background: var(--muni-superficie);
+  --ion-tab-bar-color: var(--ion-color-medium);
+  --ion-tab-bar-color-selected: var(--muni-azul-marino);
+}
+
+/* Modo oscuro (clase que pone useTema en <html>): el marino se aclara para
+   que iconos y enlaces sigan legibles */
+:root.ion-palette-dark {
+  color-scheme: dark;
+  --muni-fondo: #0b1226;
+  --muni-superficie: #131c36;
+  --muni-borde: #26324f;
+  --muni-texto: #e6eaf2;
+  --muni-texto-suave: #a9b2c3;
+  --muni-sombra: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --muni-boton-sombra: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.32);
+  --muni-boton-sombra-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 6px 16px rgba(0, 0, 0, 0.36);
+  --muni-estado-hover: rgba(143, 176, 255, 0.14);
+  --muni-estado-pulsado: rgba(143, 176, 255, 0.22);
+
+  --ion-color-primary: #8fb0ff;
+  --ion-color-primary-rgb: 143, 176, 255;
+  --ion-color-primary-contrast: #0d1f61;
+  --ion-color-primary-contrast-rgb: 13, 31, 97;
+  --ion-color-primary-shade: #7e9be0;
+  --ion-color-primary-tint: #9ab8ff;
+
+  /* 7.89:1 sobre la superficie oscura #131c36. */
+  --ion-color-medium: #a9b2c3;
+  --ion-color-medium-rgb: 169, 178, 195;
+  --ion-color-medium-contrast: #0b1226;
+  --ion-color-medium-contrast-rgb: 11, 18, 38;
+  --ion-color-medium-shade: #949cab;
+  --ion-color-medium-tint: #b2bac9;
+
+  --ion-color-secondary: #5c9ae0;
+  --ion-color-secondary-rgb: 92, 154, 224;
+  --ion-color-secondary-contrast: #0b1226;
+  --ion-color-secondary-contrast-rgb: 11, 18, 38;
+  --ion-color-secondary-shade: #5188c5;
+  --ion-color-secondary-tint: #6ca4e3;
+
+  --ion-color-success: #4caf78;
+  --ion-color-success-rgb: 76, 175, 120;
+  --ion-color-success-contrast: #0b1226;
+  --ion-color-success-contrast-rgb: 11, 18, 38;
+  --ion-color-success-shade: #439a6a;
+  --ion-color-success-tint: #5eb786;
+
+  /* #f06565 alcanza 4,5:1 sobre la superficie oscura #131c36. */
+  --ion-color-danger: #f06565;
+  --ion-color-danger-rgb: 240, 101, 101;
+  --ion-color-danger-contrast: #0b1226;
+  --ion-color-danger-contrast-rgb: 11, 18, 38;
+  --ion-color-danger-shade: #d45959;
+  --ion-color-danger-tint: #f27d7d;
+
+  --ion-background-color: var(--muni-fondo);
+  --ion-background-color-rgb: 11, 18, 38;
+  --ion-text-color: var(--muni-texto);
+  --ion-text-color-rgb: 230, 234, 242;
+  --ion-card-background: var(--muni-superficie);
+  --ion-item-background: var(--muni-superficie);
+  --ion-toolbar-background: var(--muni-superficie);
+  --ion-tab-bar-background: var(--muni-superficie);
+  --ion-tab-bar-color: #a9b2c3;
+  --ion-tab-bar-color-selected: #8fb0ff;
 }

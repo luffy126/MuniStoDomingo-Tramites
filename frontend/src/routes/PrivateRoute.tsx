@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Redireccion from './Redireccion';
 

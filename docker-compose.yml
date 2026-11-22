@@ -1,5 +1,6 @@
 # MuniStoDomingo-Tramites — orquestación completa (MariaDB + API + frontend)
 # Uso: docker compose --env-file .env.docker up --build
+# (no hace falta XAMPP ni MySQL instalado: la base de datos corre en el contenedor `db`)
 name: munistodomingo
 
 services:
@@ -13,8 +14,10 @@ services:
       MARIADB_DATABASE: ${DB_NAME:-muni_stodomingo}
       MARIADB_USER: ${DB_USER:-muniapp}
       MARIADB_PASSWORD: ${DB_PASSWORD:-munipass}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     ports:
-      - "${DB_EXTERNAL_PORT:-3307}:3306"
+      # Solo desde este equipo: con las claves de ejemplo no debe verse desde la red.
+      - "127.0.0.1:${DB_EXTERNAL_PORT:-3307}:3306"
     volumes:
       - db_data:/var/lib/mysql
       # Solo se ejecuta con el volumen vacío (primer arranque o tras `down -v`)
@@ -36,6 +39,7 @@ services:
     image: muni-backend
     container_name: muni-backend
     restart: unless-stopped
+    init: true               # reenvía SIGTERM: `docker compose stop` cierra al instante
     depends_on:
       db:
         condition: service_healthy
@@ -51,11 +55,27 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
       FRONTEND_URL: http://localhost:${FRONTEND_PORT:-8080}
       TRUST_PROXY: 1         # confía en 1 salto (Nginx) para la IP real en el rate limit
-      # Servicio de email (Resend). Sin API key el backend hace dry run (log en consola).
+      # Límites (por IP y por vecino). Los valores por defecto son los del backend.
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
+      GENERAL_RATE_LIMIT_MAX: ${GENERAL_RATE_LIMIT_MAX:-100}
+      UPLOAD_RATE_LIMIT_MAX: ${UPLOAD_RATE_LIMIT_MAX:-20}
+      CUOTA_DOCUMENTOS_MB: ${CUOTA_DOCUMENTOS_MB:-50}
+      MAX_SOLICITUDES_ABIERTAS: ${MAX_SOLICITUDES_ABIERTAS:-20}
+      # Adjuntos: carpeta definida en el Dockerfile, respaldada por el volumen uploads_data
+      UPLOAD_DIR: /app/uploads
+      # Servicio de email (Resend): 2FA, recuperación de contraseña y avisos de estado.
+      # Sin API key el backend hace dry run (los correos se ven en `docker compose logs backend`).
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-MuniStoDomingo <onboarding@resend.dev>}
+      EMAIL_REDIRECT_TO: ${EMAIL_REDIRECT_TO:-}
+      # Solo QA/demos: 1 = el dry run imprime el enlace completo de recuperación de contraseña
+      MOSTRAR_TOKEN_RECUPERACION: ${MOSTRAR_TOKEN_RECUPERACION:-0}
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      # Acceso directo a la API solo desde este equipo (sin pasar por Nginx, p. ej. Postman).
+      # Expuesta a la red, quien la use podría falsear X-Forwarded-For y saltarse el rate limit.
+      - "127.0.0.1:${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - uploads_data:/app/uploads
     networks:
       - muni-net
 
@@ -79,6 +99,7 @@ services:
 
 volumes:
   db_data:
+  uploads_data:
 
 networks:
   muni-net:

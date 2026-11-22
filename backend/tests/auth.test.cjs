@@ -25,7 +25,11 @@ require.cache[servicePath] = { id: servicePath, filename: servicePath, loaded: t
     if (serviceFailure) throw new Error('Error de persistencia simulado');
     return users.find((user) => user.email === email) || null;
   },
-  async findById(id) { return users.find((user) => user.id === id) || null; },
+  async findById(id) {
+    // El funcionario de la prueba de roles no se registra: existe solo en la "BD".
+    if (id === 50) return { id, nombre: 'Func', email: 'func@test.com', rol: 'funcionario', token_version: 0 };
+    return users.find((user) => user.id === id) || null;
+  },
 } };
 
 const express = require('express');
@@ -34,12 +38,13 @@ const bcrypt = require('bcrypt');
 const app = require('../dist/app').default;
 const { authMiddleware } = require('../dist/middleware/authMiddleware');
 const { roleMiddleware } = require('../dist/middleware/roleMiddleware');
-const { authLimiter, generalLimiter } = require('../dist/middleware/rateLimiter');
+const { authLimiter, generalLimiter, loginLimiter, recuperacionLimiter, subidaLimiter } = require('../dist/middleware/rateLimiter');
 
 // Cada escenario tiene su propia ventana; no se desactiva el middleware real.
 beforeEach(() => {
   authLimiter.resetKey('127.0.0.1');
   generalLimiter.resetKey('127.0.0.1');
+  for (const l of [loginLimiter, recuperacionLimiter, subidaLimiter]) l.resetKey('127.0.0.1');
 });
 
 test('Autenticación y autorización a través de HTTP', async (t) => {
@@ -74,7 +79,9 @@ test('Autenticación y autorización a través de HTTP', async (t) => {
     assert.equal(await bcrypt.compare(credentials.password, users[0].password_hash), true);
     token = result.body.data.token;
     const claims = jwt.verify(token, process.env.JWT_SECRET);
-    assert.deepEqual(Object.keys(claims).sort(), ['email', 'exp', 'iat', 'id', 'rol']);
+    assert.deepEqual(Object.keys(claims).sort(), ['email', 'exp', 'iat', 'id', 'rol', 'tv']);
+    // tv: versión de sesión; sube al cambiar contraseña o email y revoca el token.
+    assert.equal(claims.tv, 0);
     assert.equal(claims.exp - claims.iat, 86400);
     assert.equal(JSON.stringify(result.body).includes('password'), false);
   });
@@ -110,12 +117,16 @@ test('Autenticación y autorización a través de HTTP', async (t) => {
       });
     }
   });
-  await t.test('Perfil público con token válido: 200; usuario eliminado: 404', async () => {
+  await t.test('Perfil público con token válido: 200; usuario eliminado: 401', async () => {
     const result = await request('/api/auth/me', undefined, `Bearer ${token}`);
     assert.equal(result.status, 200);
     assert.deepEqual(Object.keys(result.body.data).sort(), ['email', 'id', 'nombre', 'rol']);
     const missingUser = jwt.sign({ id: 999, email: 'borrado@test.com', rol: 'vecino' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    assert.equal((await request('/api/auth/me', undefined, `Bearer ${missingUser}`)).status, 404);
+    // authMiddleware revisa la BD: un usuario eliminado pierde la sesión aunque el token no venza.
+    assert.equal((await request('/api/auth/me', undefined, `Bearer ${missingUser}`)).status, 401);
+    // Si la versión de sesión del token no coincide con la de la BD, también es 401.
+    const versionVieja = jwt.sign({ id: 1, email: 'test@test.com', rol: 'vecino', tv: 7 }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    assert.equal((await request('/api/auth/me', undefined, `Bearer ${versionVieja}`)).status, 401);
   });
   await t.test('Token ausente, corrupto, expirado o con payload incorrecto: 401', async () => {
     const payload = { id: 1, email: 'test@test.com', rol: 'vecino' };

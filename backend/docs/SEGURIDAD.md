@@ -31,6 +31,10 @@
 
 Además, Express tiene deshabilitado `X-Powered-By`.
 
+La compresión gzip se negocia con `Accept-Encoding` y añade ese encabezado a `Vary`. No cambia las reglas de caché: las respuestas autenticadas y los documentos siguen con sus cabeceras `no-store`/`private` correspondientes, y las descargas de adjuntos quedan fuera del middleware de compresión.
+
+El cliente guarda en memoria, durante 5 minutos, solo el catálogo público de trámites (`GET /api/tramites`) para no repetirlo al cambiar de pestaña. Esa caché no contiene solicitudes, notificaciones, datos de vecinos ni respuestas autenticadas, y desaparece al recargar la página. El service worker sigue limitado al shell y `/api/` permanece como network-only.
+
 ### HTTPS y despliegue detrás de un proxy
 
 HSTS indica al navegador que use HTTPS en conexiones posteriores a un acceso HTTPS válido. **No redirige la primera petición HTTP ni convierte el servidor Express en un servidor TLS.** El despliegue público debe terminar TLS y redirigir HTTP a HTTPS en el proxy o balanceador.
@@ -155,3 +159,26 @@ node --test tests/auth.test.cjs tests/security.test.cjs
 ```
 
 La suite de integración utiliza las variables `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD` y `TEST_DB_NAME` (por defecto, `muni_stodomingo_test`). **Borra y recrea exclusivamente esa base de pruebas**, cuyo nombre debe terminar en `_test`; no usa `DB_NAME` del entorno de desarrollo. Los resultados de una ejecución deben distinguir las pruebas HTTP sin base real de la validación de integración con MariaDB.
+
+## Riesgos conocidos
+
+### Correo no verificado en el registro
+
+**Qué pasa hoy.** `POST /api/auth/register` crea la cuenta con el correo que escribe quien se registra, sin comprobar que sea suyo. Hasta que existió el envío de correos esto era inofensivo. Ahora, cuando un funcionario cambia el estado de una solicitud, el sistema escribe a ese correo. Quien se registre con la dirección de otra persona (y cree una solicitud) hace que esa persona reciba avisos de la Municipalidad que no pidió.
+
+**Alcance.** Es un riesgo moderado, no una vulnerabilidad de acceso:
+
+- No se obtiene acceso a la cuenta ni a datos de nadie: el correo ajeno solo recibe mensajes.
+- Los mensajes son fijos y los datos que muestran se escapan con `escapeHtml`; el contenido no lo controla el atacante, salvo su propio nombre y las observaciones que él mismo escribió.
+- Cada correo exige que un funcionario cambie el estado de una solicitud de esa cuenta, y el registro ya tiene límite de peticiones (10 cada 15 minutos por IP). No es un canal para enviar correo masivo.
+- El efecto real es molestia para el destinatario y, con un dominio propio verificado, posible daño a la reputación del remitente si varios destinatarios lo marcan como spam. Mientras se use el remitente de prueba de Resend con `EMAIL_REDIRECT_TO`, el impacto práctico es nulo.
+
+**Mitigación propuesta (no implementada).**
+
+1. Agregar a `usuario` la columna `email_verificado_en DATETIME NULL`.
+2. Al registrarse, generar un token aleatorio de un solo uso con vencimiento corto (por ejemplo 24 horas), guardar solo su hash y enviar un enlace de verificación a ese correo.
+3. Al abrir el enlace, marcar `email_verificado_en` y consumir el token.
+4. Enviar avisos por correo solo a cuentas con `email_verificado_en` no nulo. Los avisos dentro de la aplicación no cambian.
+5. Ofrecer reenviar el enlace, con límite de peticiones propio.
+
+Costo: un endpoint nuevo, una pantalla de confirmación en el front y una migración para las cuentas existentes (marcar como verificadas las de prueba de la semilla). Conviene hacerlo antes de usar un dominio verificado con usuarios reales.

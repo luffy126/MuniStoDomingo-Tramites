@@ -8,6 +8,12 @@ const { once } = require('node:events');
 process.env.JWT_SECRET = randomBytes(48).toString('hex');
 process.env.JWT_EXPIRES_IN = '24h';
 process.env.NODE_ENV = 'test';
+// El .env de desarrollo puede traer TRUST_PROXY; aquí se prueba el servidor SIN proxy de confianza.
+process.env.TRUST_PROXY = '';
+process.env.RESEND_API_KEY = '';
+// El .env local puede subir el límite para el suite E2E; esta prueba verifica el valor seguro.
+process.env.AUTH_RATE_LIMIT_MAX = '10';
+process.env.GENERAL_RATE_LIMIT_MAX = '100';
 
 const writes = [];
 function stubService(name, exports) {
@@ -16,6 +22,8 @@ function stubService(name, exports) {
 }
 stubService('userService', {
   async findByEmail() { return null; },
+  // authMiddleware confirma que el usuario exista y que su versión de sesión coincida.
+  async findById(id) { return { id, nombre: 'Seguridad', email: 'seguridad@test.com', rol: 'vecino', token_version: 0 }; },
   async createUser(nombre, email, _passwordHash, rol) {
     writes.push({ nombre, email });
     return { id: 1, nombre, email, rol };
@@ -29,6 +37,8 @@ stubService('tramiteService', {
   async getById(id) { return { id, activo: true }; },
 });
 stubService('solicitudService', {
+  async contarAbiertas() { return 0; },
+  maxSolicitudesAbiertas() { return 20; },
   async create(tramiteId, vecinoId, observaciones) {
     writes.push({ observaciones });
     return { id: 'SOL-1001', tramiteId, vecinoId, observaciones, estado: 'pendiente' };
@@ -37,11 +47,20 @@ stubService('solicitudService', {
     writes.push({ observaciones });
     return { tipo: 'actualizada', solicitud: { id, estado, funcionarioId, observaciones } };
   },
+  // El controlador relee el detalle después del PATCH para incluir el historial.
+  async getById(id) {
+    const ultimo = writes[writes.length - 1] ?? {};
+    return {
+      id,
+      estado: 'en_revision',
+      ...(ultimo.observaciones !== undefined ? { observaciones: ultimo.observaciones } : {}),
+    };
+  },
 });
 
 const jwt = require('jsonwebtoken');
 const app = require('../dist/app').default;
-const { authLimiter, generalLimiter } = require('../dist/middleware/rateLimiter');
+const { authLimiter, generalLimiter, loginLimiter, recuperacionLimiter, subidaLimiter } = require('../dist/middleware/rateLimiter');
 
 test('Seguridad avanzada a través de HTTP', async (t) => {
   const server = app.listen(0, '127.0.0.1');
@@ -61,6 +80,7 @@ test('Seguridad avanzada a través de HTTP', async (t) => {
   t.beforeEach(() => {
     authLimiter.resetKey('127.0.0.1');
     generalLimiter.resetKey('127.0.0.1');
+    for (const l of [loginLimiter, recuperacionLimiter, subidaLimiter]) l.resetKey('127.0.0.1');
     writes.length = 0;
   });
 
@@ -89,16 +109,17 @@ test('Seguridad avanzada a través de HTTP', async (t) => {
     }
   });
 
-  await t.test('Auth comparte diez intentos entre login y registro; el siguiente devuelve 429', async () => {
+  await t.test('Login admite diez intentos fallidos y bloquea el siguiente; el registro tiene su propio cupo', async () => {
     for (let i = 0; i < 10; i++) {
-      const path = i % 2 === 0 ? '/api/auth/login' : '/api/auth/register';
-      const result = await request('POST', path, { body: {} });
+      const result = await request('POST', '/api/auth/login', { body: {} });
       assert.equal(result.status, 400, `intento ${i + 1}`);
     }
+    // Los contadores son independientes: el registro aún no está bloqueado.
+    assert.equal((await request('POST', '/api/auth/register', { body: {} })).status, 400);
     const blocked = await request('POST', '/api/auth/login', { body: {} });
     assert.equal(blocked.status, 429);
     assert.deepEqual(blocked.body, {
-      success: false, error: 'Demasiados intentos. Intenta de nuevo en 15 minutos.',
+      success: false, error: 'Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.',
     });
     assert.match(blocked.headers.get('ratelimit'), /limit=10, remaining=0/);
     assert.match(blocked.headers.get('ratelimit-policy'), /10;w=900/);

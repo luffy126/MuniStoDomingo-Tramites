@@ -10,7 +10,7 @@ COPY . .
 
 # URL base de la API, inyectada en build time.
 # "/" => rutas relativas (/api/...) que Nginx reenvía al backend.
-# Ojo: una cadena vacía NO sirve, apiClient.ts cae a http://localhost:3000.
+# (Una cadena vacía también funcionaría con el apiClient actual, pero "/" es explícito.)
 ARG VITE_API_URL=/
 ENV VITE_API_URL=$VITE_API_URL
 
@@ -22,8 +22,9 @@ FROM nginx:1.27-alpine
 # Build estático
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Config SPA + proxy reverso a la API
+# Config SPA + proxy reverso a la API, y cabeceras de seguridad de los estáticos
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 EXPOSE 80
 

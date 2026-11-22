@@ -27,6 +27,13 @@ COPY --from=builder /app/dist ./dist
 
 # Usuario no-root por seguridad
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Adjuntos de los vecinos (PDF/JPG/PNG): carpeta propia del usuario no-root.
+# docker-compose monta aquí el volumen `uploads_data`; al crearse vacío hereda
+# este dueño y permisos, así que la API puede escribir sin correr como root.
+ENV UPLOAD_DIR=/app/uploads
+RUN mkdir -p "$UPLOAD_DIR" && chown appuser:appgroup "$UPLOAD_DIR" && chmod 700 "$UPLOAD_DIR"
+
 USER appuser
 
 EXPOSE 3000

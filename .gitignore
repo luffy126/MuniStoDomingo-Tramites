@@ -17,6 +17,7 @@ coverage/
 # Entorno y logs
 .env
 .env.local
+.env.docker.local
 .env.development.local
 .env.test.local
 .env.production.local
@@ -29,3 +30,7 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Adjuntos de los vecinos (datos personales): nunca al repositorio
+uploads/
+.uploads-test/

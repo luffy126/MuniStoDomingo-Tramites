@@ -2,6 +2,8 @@
 
 Aplicación móvil y web para que los vecinos de la **Municipalidad de Santo Domingo** realicen y sigan trámites municipales en línea, sin filas ni horarios de oficina.
 
+> **Esta rama (`docker`) contiene el proyecto completo listo para montar:** base de datos, API y frontend con un solo comando, sin instalar Node, MariaDB ni XAMPP. Ver [Puesta en marcha con Docker](#puesta-en-marcha-con-docker).
+
 ## Integrantes del equipo
 
 | Nombre | Rol en el proyecto |
@@ -9,17 +11,19 @@ Aplicación móvil y web para que los vecinos de la **Municipalidad de Santo Dom
 | Simón Ledezma | Frontend + organización |
 | Tomás Monge | Setup proyecto + Figma Movil |
 | Francisco Espinoza | Figma Web + Debugging |
+| Melissa Rojas | QA Analyst + Postman en APIs |
 
 ## Distribución de responsabilidades
 
-- **Frontend (Ionic + React):** estructura de vistas, componentes, navegación con React Router.
-- **UI/UX y Figma:** mockups móvil/web, flujo de navegación, jerarquía visual.
-- **Backend (a desarrollar en EP2):** API REST, base de datos relacional, autenticación JWT.
+- **Frontend (Ionic + React):** vistas, componentes, navegación con React Router, tema "Comuna Parque" y zonas de carga de documentos.
+- **UI/UX y Figma:** prototipos móvil/web, flujo de navegación, jerarquía visual.
+- **Backend (Express + MariaDB):** API REST, base de datos relacional, autenticación JWT, verificación en dos pasos por correo y adjuntos.
+- **Calidad:** pruebas automatizadas de la API y colección de Postman con evidencia de validación.
 - **Documentación y gestión:** README, ramas, control de versiones, evidencia de avance.
 
 ## Descripción general
 
-MuniStoDomingo es una plataforma que permite a los vecinos consultar el catálogo de trámites disponibles, iniciar una solicitud, adjuntar documentos digitales y hacer seguimiento del estado en tiempo real. Incluye un rol de **Funcionario municipal** encargado de gestionar las solicitudes: revisarlas, aprobarlas, rechazarlas o solicitar información adicional, además de visualizar reportes y estadísticas del servicio.
+MuniStoDomingo es una plataforma que permite a los vecinos consultar el catálogo de trámites disponibles, iniciar una solicitud, adjuntar los documentos que cada trámite exige y hacer seguimiento del estado. Incluye un rol de **Funcionario municipal** encargado de gestionar las solicitudes: revisarlas, aprobarlas, rechazarlas o pedir más información, además de visualizar reportes y estadísticas del servicio.
 
 ## Problema que aborda
 
@@ -40,22 +44,22 @@ La aplicación responde a este contexto y a los principios de transformación di
 | --- | --- | --- |
 | RF-01 | Vecino | Catálogo de trámites con búsqueda y filtros por categoría |
 | RF-02 | Vecino | Inicio de trámite: selección y envío del formulario correspondiente |
-| RF-03 | Vecino | Adjuntar documentos digitales (PDF/imagen) con validación de formato y tamaño |
-| RF-04 | Vecino | Seguimiento del estado del trámite (Pendiente > En revisión > Aprobado/Rechazado) |
-| RF-05 | Vecino | Notificaciones ante cambios de estado o requerimientos de información |
-| RF-06 | Vecino | Gestión del perfil (nombre, teléfono, dirección) |
+| RF-03 | Vecino | Adjuntar documentos digitales (PDF/JPG/PNG, hasta 5 MB) con validación de formato y tamaño; cada requisito tiene su zona de carga antes de iniciar el trámite |
+| RF-04 | Vecino | Seguimiento del estado del trámite (Pendiente > En revisión > Aprobado/Rechazado) con su historial |
+| RF-05 | Vecino | Notificaciones ante cambios de estado o requerimientos de información, también por correo |
+| RF-06 | Vecino | Gestión del perfil (nombre, correo, teléfono, dirección) y verificación en dos pasos por correo |
 | RF-07 | Funcionario | Gestión de solicitudes: listar, filtrar y priorizar |
 | RF-08 | Funcionario | Resolución de solicitudes: aprobar, rechazar o solicitar información, con observaciones |
 | RF-09 | Funcionario | Panel de reportes y estadísticas (cantidad por estado, tiempos, tipos más solicitados) |
 
-Mas detalles ha futuro en [`README.md` de la rama `frontend`](../../tree/frontend). (actualmente trabajando en el Figma antes que mas ramas)
+Además: registro, recuperación de contraseña por correo y cancelación de solicitudes pendientes.
 
 ## Requerimientos no funcionales
 
 | ID | Categoría | Descripción |
 | --- | --- | --- |
 | RNF-01 | Rendimiento | Páginas cargables en menos de 3 s en conexiones 3G (Lighthouse Performance ≥ 70) |
-| RNF-02 | Seguridad | Contraseñas de mínimo 8 caracteres (mayúscula, minúscula y número); rutas protegidas por autenticación y rol |
+| RNF-02 | Seguridad | Contraseñas de mínimo 8 caracteres (mayúscula, minúscula y número); rutas protegidas por autenticación y rol; sesiones revocables, límites de peticiones y cabeceras de seguridad |
 | RNF-03 | Usabilidad | Acciones principales en máximo 3 clics desde el dashboard; errores de formulario en tiempo real |
 | RNF-04 | Accesibilidad | WCAG 2.1 nivel AA (contraste ≥ 4.5:1, navegación por teclado, etiquetas ARIA) |
 | RNF-05 | Compatibilidad | Funcionamiento en Chrome, Firefox y Safari, y en móvil vía Capacitor (iOS/Android) |
@@ -63,50 +67,67 @@ Mas detalles ha futuro en [`README.md` de la rama `frontend`](../../tree/fronten
 ## Tecnologías y herramientas
 
 **Frontend**
-- Ionic + React + TypeScript
+- Ionic 9 + React 19 + TypeScript, con Vite
 - React Router
 - Capacitor
+- Pruebas: Vitest y Cypress
 
-**Backend** *(Entrega Parcial 2)*
-- Node.js + Express
-- PostgreSQL / MySQL
-- JWT + bcrypt
+**Backend**
+- Node.js + Express 5 + TypeScript
+- MariaDB / MySQL (driver `mysql2`)
+- JWT + bcrypt, helmet, express-rate-limit y express-validator
+- Resend para los correos (2FA, recuperación de contraseña y avisos de estado)
+- Pruebas con el runner de Node (`node:test`)
 
-**Herramientas**
+**Despliegue y herramientas**
+- Docker + Docker Compose (MariaDB, API y Nginx)
 - Figma (prototipado UI/UX)
 - Git / GitHub
 - Postman / Insomnia
 
-## Instrucciones de instalación
+## Puesta en marcha con Docker
+
+Solo necesitas **Docker con Compose v2**. No hace falta instalar Node, npm, MariaDB ni XAMPP.
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/luffy126/MuniStoDomingo-Tramites.git
+# Clonar la rama docker
+git clone -b docker https://github.com/luffy126/MuniStoDomingo-Tramites.git
 cd MuniStoDomingo-Tramites
 
-# Cambiar a la rama frontend
-git checkout frontend
-
-# Instalar dependencias
-npm install
+# Construir y levantar base de datos, API y frontend
+docker compose --env-file .env.docker up --build
 ```
 
-## Instrucciones de ejecución
+La primera vez tarda unos minutos. Cuando los tres contenedores estén `healthy`:
 
-```bash
-# Levantar la app en modo desarrollo (web)
-npm run dev
+| Qué | URL |
+| --- | --- |
+| Aplicación | http://localhost:8080 |
+| API (vía Nginx) | http://localhost:8080/api/health |
+| API (directo, solo desde tu equipo) | http://localhost:3000/api/health |
 
-# Alternativa con Ionic CLI
-npx ionic serve
+**Usuarios de prueba** (contraseña `Test1234`): `vecino@test.com` y `funcionario@test.com`.
 
-# Compilar para producción
-npm run build
+Sin clave de Resend, los correos (incluido el código de 6 dígitos de la verificación en dos pasos) aparecen en los logs: `docker compose logs -f backend`. El detalle de variables, volúmenes, claves y problemas comunes está en [`DOCKER.md`](DOCKER.md).
 
-# Ejecutar en emulador Android/iOS
-npx ionic capacitor run android
-npx ionic capacitor run ios
+### Solo la base de datos (en lugar de XAMPP)
+
+Si prefieres correr el backend y el frontend en tu equipo con `npm run dev`, levanta únicamente MariaDB en Docker; la base se crea y se llena con la semilla sola. Las instrucciones están en la sección "Solo la base de datos" de [`DOCKER.md`](DOCKER.md).
+
+## Estructura de esta rama
+
 ```
+.
+├── docker-compose.yml   Orquestación: db + backend + frontend
+├── .env.docker          Variables de ejemplo para docker compose
+├── DOCKER.md            Guía completa de despliegue con Docker
+├── sync.sh              Trae el código de las ramas backend y frontend
+├── backend/             API Express (copia de la rama backend + Dockerfile)
+├── frontend/            App Ionic/React (copia de la rama frontend + Dockerfile y nginx.conf)
+└── docs/EP1/            Documentación de la entrega parcial 1
+```
+
+`backend/` y `frontend/` son copias de las ramas `backend` y `frontend`: el código se edita en esas ramas y aquí se actualiza con `./sync.sh`.
 
 ## Diseño y prototipo
 - [Prototipo en Figma](#): https://www.figma.com/design/PDRMB1YzTolGblTi9Cxy10/MuniSitioDomingo?node-id=0-1&t=wjmz0PMK0jp7Rtdt-1
@@ -125,10 +146,13 @@ La documentación de cada punto de la EP 1 está centralizada en [`docs/EP1/`](d
 | [EP 1.5](docs/EP1/EP1.5-proyecto-ionic/) | Creación del proyecto en Ionic con React |
 | [EP 1.6](docs/EP1/EP1.6-pantallas/) | Diseño de las pantallas principales |
 
+La referencia de la API está en [`backend/docs/API.md`](backend/docs/API.md) y las medidas de seguridad en [`backend/docs/SEGURIDAD.md`](backend/docs/SEGURIDAD.md).
+
 ## Ramas del repositorio
 
 | Rama | Contenido |
 | --- | --- |
 | `main` | Documentación general del proyecto |
-| `frontend` | Código de interfaz (Ionic + React) + requerimientos funcionales/no funcionales |
-| `backend` | API REST, conexión a base de datos y script `.sql` |
+| `frontend` | Código de interfaz (Ionic + React) |
+| `backend` | API REST, conexión a base de datos, esquema `.sql` y migraciones |
+| `docker` | Proyecto completo listo para montar con `docker compose` |

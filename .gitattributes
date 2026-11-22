@@ -1,0 +1,4 @@
+# Los scripts de shell y las configs que viajan a contenedores Linux siempre con LF
+*.sh text eol=lf
+*.conf text eol=lf
+Dockerfile text eol=lf

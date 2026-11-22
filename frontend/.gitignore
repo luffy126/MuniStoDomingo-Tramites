@@ -31,3 +31,7 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Reportes generados por Lighthouse CI
+.lighthouseci/
+reports/

@@ -27,6 +27,7 @@ está en la rama `frontend`.
 - bcrypt para hash de contraseñas
 - express-validator para validación de inputs
 - cors para Cross-Origin Resource Sharing
+- compression para gzip de respuestas JSON (umbral 1 kB; no comprime adjuntos)
 - dotenv para variables de entorno
 
 ## Puesta en marcha
@@ -37,7 +38,20 @@ Se necesita un servidor MySQL o MariaDB corriendo en el puerto 3306. La forma m�
 Windows es [XAMPP](https://www.apachefriends.org): instalarlo y presionar *Start* en
 **MySQL** desde el panel de control. El usuario `root` de XAMPP viene sin contraseña.
 
-Cargar el esquema con sus datos de prueba (crea la base `muni_stodomingo` por sí solo):
+**En un equipo nuevo, lo más simple** es el script de inicialización (no necesita el cliente
+`mysql` en el PATH; usa el mismo driver que el backend):
+
+```bash
+npm install
+npm run db:init
+```
+
+Crea `.env` si falta (con un `JWT_SECRET` nuevo y `DB_PASSWORD` vacío, como XAMPP), crea la base
+`DB_NAME`, carga el esquema completo con los datos semilla y verifica el resultado. Si la base ya
+tiene tablas se niega a continuar para no borrar datos; `npm run db:init -- --force` la recrea
+desde cero. Si tu usuario de MySQL tiene contraseña, escríbela en `DB_PASSWORD` del `.env`.
+
+Alternativa manual: cargar el esquema con sus datos de prueba (crea la base `muni_stodomingo` por sí solo):
 
 ```bash
 mysql -u root -p --default-character-set=utf8mb4 < schema.sql
@@ -50,6 +64,15 @@ tiene contraseña. También se puede importar `schema.sql` desde phpMyAdmin
 `schema.sql` crea las cinco tablas y carga datos semilla, de modo que el sistema queda
 utilizable apenas se levanta. Se puede volver a ejecutar para reiniciar los datos a la
 semilla (borra y recrea las tablas con `DROP TABLE IF EXISTS`; la base no se elimina).
+
+Para una base que ya exista, aplicar las migraciones idempotentes en orden:
+
+```bash
+mysql -u root --default-character-set=utf8mb4 muni_stodomingo < migrations/2026-11-18_mejoras.sql
+mysql -u root --default-character-set=utf8mb4 muni_stodomingo < migrations/2026-11-19_rendimiento.sql
+```
+
+La segunda agrega índices para listados, reportes y notificaciones; se puede repetir sin error.
 
 ### 2. Backend
 
@@ -76,6 +99,7 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 | Script | Qué hace |
 | --- | --- |
 | `npm run dev` | Levanta el servidor con `ts-node` y lo reinicia con `nodemon` al guardar cambios en `src/` |
+| `npm run db:init` | Inicializa la base en un equipo nuevo (crea `.env` si falta, carga `schema.sql`). `-- --force` la recrea |
 | `npm run typecheck` | Revisa los tipos sin generar archivos. Debe pasar antes de abrir un PR |
 | `npm test` | Compila y ejecuta las pruebas (`tests/`). **Necesitan MySQL/MariaDB en marcha**, ver [Pruebas](#pruebas) |
 | `npm run build` | Compila TypeScript a `dist/` |
@@ -83,6 +107,7 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 
 ### Pruebas
 
+`tests/unit.test.cjs` prueba la paginación y el armado del correo sin base de datos ni red.
 `tests/auth.test.cjs` prueba auth y roles con la persistencia simulada.
 `tests/security.test.cjs` comprueba los headers de Helmet, límites de peticiones y
 validación de texto libre sin necesitar una base de datos. `tests/api.test.cjs`
@@ -156,8 +181,13 @@ Evidencia de ejecución:
 | `PORT` | Puerto del servidor | `3000` |
 | `NODE_ENV` | En `development` el detalle y el stack de los errores 500 solo se escriben en la consola del servidor; nunca se envían al cliente | `development` |
 | `FRONTEND_URL` | Origen permitido por CORS | `http://localhost:5173` si el front corre con Vite (`npm run dev`), `http://localhost:8100` con `ionic serve` |
+| `AUTH_RATE_LIMIT_MAX` | Intentos por IP cada 15 minutos en login, registro y recuperación | `10` (seguro); subirlo solo en desarrollo para el suite E2E |
+| `GENERAL_RATE_LIMIT_MAX` | Peticiones por IP y minuto antes de procesar cualquier ruta | `100` (seguro); subirlo solo en desarrollo para el suite E2E |
 
-El archivo `.env` nunca se sube al repositorio; `.env.example` documenta las claves.
+El archivo `.env` nunca se sube al repositorio; `.env.example` documenta las claves. Los límites
+de peticiones son configurables solo para desarrollo: los valores por defecto (10 y 100) son los
+que deben quedar en producción. El suite E2E del frontend necesita más margen porque inicia
+sesión varias veces y hace muchas peticiones en menos de un minuto.
 
 ## Arquitectura
 

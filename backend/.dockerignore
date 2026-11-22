@@ -11,3 +11,8 @@ postman_collection.json
 README.md
 Dockerfile
 .dockerignore
+scripts
+migrations
+Crear BD.md
+uploads
+.uploads-test

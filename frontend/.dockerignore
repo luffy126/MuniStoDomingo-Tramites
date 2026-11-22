@@ -14,3 +14,12 @@ docs
 .agents
 Dockerfile
 .dockerignore
+reports
+.lighthouseci
+lighthouserc.json
+capturas
+dist-rediseno
+vite.rediseno.config.ts
+Compartir.bat
+compartir.ps1
+coverage

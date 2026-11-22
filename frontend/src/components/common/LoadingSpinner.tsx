@@ -2,9 +2,10 @@ import { IonContent, IonPage, IonSpinner, IonText } from '@ionic/react';
 
 interface LoadingSpinnerProps {
   mensaje?: string;
+  children?: React.ReactNode;
 }
 
-const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ mensaje = 'Cargando…' }) => (
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ mensaje = 'Cargando…', children }) => (
   <IonPage>
     <IonContent className="ion-padding">
       <div className="centro-vertical">
@@ -12,6 +13,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ mensaje = 'Cargando…'
         <IonText color="medium">
           <p>{mensaje}</p>
         </IonText>
+        {children}
       </div>
     </IonContent>
   </IonPage>

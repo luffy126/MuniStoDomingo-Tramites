@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { IonButton, IonInput, IonNote, IonSpinner } from '@ionic/react';
-import { esEmailValido } from '../../utils/validators';
+import { useRef, useState } from 'react';
+import CampoFormulario from './CampoFormulario';
+import BotonCargando from '../common/BotonCargando';
+import { validarEmail } from '../../utils/validators';
+import { enfocarPrimerError } from '../../utils/formulario';
 
 interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
@@ -12,28 +14,48 @@ interface ErroresLogin {
   password?: string;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, cargando }) => {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [errores, setErrores] = useState<ErroresLogin>({});
+type CampoLogin = keyof ErroresLogin;
 
-  const validar = (): ErroresLogin => {
-    const nuevos: ErroresLogin = {};
-    if (email.trim() === '') {
-      nuevos.email = 'El correo es obligatorio.';
-    } else if (!esEmailValido(email)) {
-      nuevos.email = 'Ingresa un correo con formato válido.';
+const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, cargando }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errores, setErrores] = useState<ErroresLogin>({});
+  const [tocados, setTocados] = useState<Record<CampoLogin, boolean>>({
+    email: false,
+    password: false,
+  });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const validarCampo = (campo: CampoLogin, valor: string): string | undefined => {
+    if (campo === 'email') return validarEmail(valor);
+    return valor === '' ? 'La contraseña es obligatoria.' : undefined;
+  };
+
+  const actualizar = (campo: CampoLogin, valor: string): void => {
+    if (campo === 'email') setEmail(valor);
+    else setPassword(valor);
+    if (tocados[campo]) {
+      setErrores((previos) => ({ ...previos, [campo]: validarCampo(campo, valor) }));
     }
-    if (password === '') {
-      nuevos.password = 'La contraseña es obligatoria.';
-    }
-    return nuevos;
+  };
+
+  const marcarTocado = (campo: CampoLogin): void => {
+    setTocados((previos) => ({ ...previos, [campo]: true }));
+    setErrores((previos) => ({
+      ...previos,
+      [campo]: validarCampo(campo, campo === 'email' ? email : password),
+    }));
   };
 
   const manejarEnvio = async (): Promise<void> => {
-    const nuevos = validar();
+    const nuevos: ErroresLogin = {
+      email: validarCampo('email', email),
+      password: validarCampo('password', password),
+    };
+    setTocados({ email: true, password: true });
     setErrores(nuevos);
-    if (Object.keys(nuevos).length > 0) {
+    if (nuevos.email !== undefined || nuevos.password !== undefined) {
+      window.setTimeout(() => enfocarPrimerError(formRef.current), 0);
       return;
     }
     await onSubmit(email.trim(), password);
@@ -41,12 +63,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, cargando }) => {
 
   return (
     <form
+      ref={formRef}
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void manejarEnvio();
       }}
     >
-      <IonInput
+      <CampoFormulario
+        id="login-email"
         label="Correo electrónico"
         labelPlacement="floating"
         fill="outline"
@@ -55,34 +80,34 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, cargando }) => {
         autocomplete="email"
         placeholder="vecino@test.com"
         value={email}
+        error={errores.email}
         className="ion-margin-bottom"
-        onIonInput={(event) => setEmail(event.detail.value ?? '')}
+        onValorChange={(valor) => actualizar('email', valor)}
+        onIonBlur={() => marcarTocado('email')}
       />
-      {errores.email !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
-          {errores.email}
-        </IonNote>
-      ) : null}
 
-      <IonInput
+      <CampoFormulario
+        id="login-password"
         label="Contraseña"
         labelPlacement="floating"
         fill="outline"
         type="password"
         autocomplete="current-password"
         value={password}
+        error={errores.password}
         className="ion-margin-top ion-margin-bottom"
-        onIonInput={(event) => setPassword(event.detail.value ?? '')}
+        onValorChange={(valor) => actualizar('password', valor)}
+        onIonBlur={() => marcarTocado('password')}
       />
-      {errores.password !== undefined ? (
-        <IonNote color="danger" className="mensaje-error">
-          {errores.password}
-        </IonNote>
-      ) : null}
 
-      <IonButton type="submit" expand="block" className="ion-margin-top" disabled={cargando}>
-        {cargando ? <IonSpinner name="dots" /> : 'Ingresar'}
-      </IonButton>
+      <BotonCargando
+        type="submit"
+        expand="block"
+        className="ion-margin-top"
+        cargando={cargando}
+        texto="Ingresar"
+        textoCargando="Ingresando…"
+      />
     </form>
   );
 };

@@ -1,13 +1,69 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+import storageService from './storageService';
+
+/** Vacío por defecto: las rutas ya empiezan con `/api` y salen por el proxy same-origin. */
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 export const TOKEN_KEY = 'munisd.token';
 export const SESSION_KEY = 'munisd.sesion';
 export const UNAUTHORIZED_EVENT = 'munisd:unauthorized';
+
+/**
+ * Copia del token en memoria. localStorage manda (refleja un login o logout hecho
+ * en otra pestaña), pero si el navegador lo bloquea (modo privado, WebView
+ * restringido) el token restaurado desde IndexedDB queda aquí y las peticiones
+ * siguen autenticadas.
+ */
+let tokenEnMemoria: string | null = null;
+
+export const recordarToken = (token: string | null): void => {
+  tokenEnMemoria = token;
+};
+
+const leerToken = (): string | null => {
+  try {
+    return window.localStorage.getItem(TOKEN_KEY) ?? tokenEnMemoria;
+  } catch {
+    return tokenEnMemoria;
+  }
+};
+
+/** Metadatos que el backend agrega a los listados paginados. */
+export interface Paginacion {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  /** Solo en notificaciones: cuántas no leídas hay en total (todas las páginas). */
+  unread?: number;
+}
+
+/** Una página de un listado: los elementos y sus metadatos de paginación. */
+export interface Pagina<T> {
+  data: T[];
+  pagination: Paginacion;
+}
 
 interface ApiEnvelope<T> {
   success: boolean;
   data?: T;
   error?: string;
+  pagination?: Paginacion;
 }
+
+/**
+ * Tiempo máximo de espera por el backend. Sin límite, una petición que queda
+ * colgada (p. ej. mientras el backend se reinicia detrás del túnel) dejaría la
+ * app en el spinner de carga para siempre.
+ */
+export const TIMEOUT_MS = 15_000;
+
+/** Tamaño de página al traer un listado completo: el máximo que acepta el backend. */
+const LIMITE_PAGINA = 100;
+/** Tamaño de página de las pantallas con "Cargar más" (el valor por defecto del backend). */
+const LIMITE_POR_DEFECTO = 20;
+/** Tope de páginas por listado, para no quedar en un ciclo si el backend respondiera mal. */
+const MAX_PAGINAS = 50;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -19,29 +75,48 @@ export class ApiError extends Error {
   }
 }
 
-const apiClient = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
+/** Si el token dejó de servir, se cierra la sesión en todas las pestañas. */
+const manejarNoAutorizado = (): void => {
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Ignorar si el almacenamiento no está disponible.
+  }
+  // También el respaldo: si no, la próxima apertura restauraría un token vencido.
+  tokenEnMemoria = null;
+  void storageService.remove(TOKEN_KEY);
+  void storageService.remove(SESSION_KEY);
+  window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+};
+
+const solicitar = async <T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> => {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
   if (options.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
-  try {
-    const token = window.localStorage.getItem(TOKEN_KEY);
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-  } catch {
-    // El navegador puede bloquear localStorage; las rutas públicas siguen disponibles.
-  }
+  const token = leerToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
   let response: Response;
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_MS);
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, signal: controlador.signal });
   } catch {
-    throw new Error('No se pudo conectar con el servidor. Revisa que el backend esté ejecutándose.');
+    throw new Error(
+      controlador.signal.aborted
+        ? 'El servidor tardó demasiado en responder. Intenta de nuevo en un momento.'
+        : 'No pudimos conectar con el servicio. Revisa tu conexión e inténtalo de nuevo.',
+    );
+  } finally {
+    clearTimeout(temporizador);
   }
 
   // Las respuestas 204 (p. ej. cancelar una solicitud) no traen cuerpo que parsear.
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) return { success: true };
 
   let body: ApiEnvelope<T>;
   try {
@@ -50,27 +125,154 @@ const apiClient = async <T>(path: string, options: RequestInit = {}): Promise<T>
     throw new ApiError('El servidor devolvió una respuesta inválida.', response.status);
   }
 
-  if (response.status === 401) {
-    try {
-      window.localStorage.removeItem(TOKEN_KEY);
-      window.localStorage.removeItem(SESSION_KEY);
-    } catch {
-      // Ignorar si el almacenamiento no está disponible.
-    }
-    window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-  }
+  if (response.status === 401) manejarNoAutorizado();
 
   if (!response.ok || body.success !== true) {
     throw new ApiError(body.error || `Error de comunicación con el servidor (${response.status}).`, response.status);
   }
 
-  return body.data as T;
+  return body;
 };
+
+const apiClient = async <T>(path: string, options: RequestInit = {}): Promise<T> =>
+  (await solicitar<T>(path, options)).data as T;
+
+/**
+ * Trae un listado completo recorriendo todas sus páginas.
+ *
+ * El backend entrega los listados de a 20 por defecto; pedir solo la primera
+ * página dejaría fuera, sin aviso, lo que no cabe en ella. Si el backend aún no
+ * pagina (no envía `pagination`), se devuelve lo recibido tal cual.
+ */
+const getTodos = async <T>(path: string): Promise<T[]> => {
+  const separador = path.includes('?') ? '&' : '?';
+  const items: T[] = [];
+  for (let page = 1; page <= MAX_PAGINAS; page += 1) {
+    const body = await solicitar<T[]>(`${path}${separador}page=${page}&limit=${LIMITE_PAGINA}`);
+    items.push(...(body.data ?? []));
+    if (!body.pagination?.hasNext) break;
+  }
+  return items;
+};
+
+/**
+ * Trae una sola página de un listado, con sus metadatos de paginación.
+ *
+ * Es lo que usan las pantallas con "Cargar más". Si el backend aún no pagina
+ * (no envía `pagination`), se entrega todo lo recibido como una única página.
+ */
+const getPagina = async <T>(path: string, page = 1, limit = LIMITE_POR_DEFECTO): Promise<Pagina<T>> => {
+  const separador = path.includes('?') ? '&' : '?';
+  const body = await solicitar<T[]>(`${path}${separador}page=${page}&limit=${limit}`);
+  const data = body.data ?? [];
+  return {
+    data,
+    pagination: body.pagination ?? {
+      page: 1, limit: data.length, total: data.length, totalPages: 1, hasNext: false, hasPrev: false,
+    },
+  };
+};
+
+/**
+ * Descarga un archivo autenticado. No se pone el token en la URL: viaja en la
+ * cabecera, igual que en el resto de la API.
+ */
+const getBlob = async (path: string): Promise<{ blob: Blob; tipo: string }> => {
+  const headers = new Headers({ Accept: 'application/octet-stream' });
+  const token = leerToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers,
+      signal: controlador.signal,
+    });
+  } catch {
+    throw new Error('No pudimos descargar el archivo. Revisa tu conexión e inténtalo de nuevo.');
+  } finally {
+    clearTimeout(temporizador);
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) manejarNoAutorizado();
+    let mensaje = `No se pudo descargar el archivo (${response.status}).`;
+    try {
+      const cuerpo = await response.json() as ApiEnvelope<unknown>;
+      mensaje = cuerpo.error ?? mensaje;
+    } catch {
+      // La respuesta no era JSON: se conserva el mensaje genérico.
+    }
+    throw new ApiError(mensaje, response.status);
+  }
+
+  return { blob: await response.blob(), tipo: response.headers.get('content-type') ?? 'application/octet-stream' };
+};
+
+/**
+ * Sube un archivo con progreso real. `fetch` no expone `upload.onprogress`,
+ * así que esta es la única parte del cliente que usa XHR.
+ */
+const postArchivoConProgreso = <T>(
+  path: string,
+  archivo: File,
+  onProgreso?: (porcentaje: number) => void,
+  cabecerasExtra?: Record<string, string>
+): Promise<T> => new Promise<T>((resolve, reject) => {
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${API_BASE_URL}${path}`);
+  xhr.timeout = 60_000;
+  xhr.setRequestHeader('Accept', 'application/json');
+  xhr.setRequestHeader('Content-Type', archivo.type || 'application/octet-stream');
+  xhr.setRequestHeader('X-Nombre-Archivo', encodeURIComponent(archivo.name));
+  for (const [nombre, valor] of Object.entries(cabecerasExtra ?? {})) xhr.setRequestHeader(nombre, valor);
+  const token = leerToken();
+  if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+  if (onProgreso) {
+    xhr.upload.onprogress = (evento) => {
+      if (evento.lengthComputable && evento.total > 0) {
+        onProgreso(Math.min(100, Math.round((evento.loaded * 100) / evento.total)));
+      }
+    };
+  }
+
+  xhr.onload = () => {
+    if (xhr.status === 401) manejarNoAutorizado();
+    let cuerpo: ApiEnvelope<T>;
+    try {
+      cuerpo = JSON.parse(xhr.responseText) as ApiEnvelope<T>;
+    } catch {
+      reject(new ApiError('El servidor devolvió una respuesta inválida.', xhr.status));
+      return;
+    }
+    if (xhr.status >= 200 && xhr.status < 300 && cuerpo.success) {
+      onProgreso?.(100);
+      resolve(cuerpo.data as T);
+      return;
+    }
+    reject(new ApiError(
+      cuerpo.error || `No se pudo subir el archivo (${xhr.status}).`,
+      xhr.status,
+    ));
+  };
+  xhr.onerror = () => reject(new Error('No pudimos subir el archivo. Revisa tu conexión e inténtalo de nuevo.'));
+  xhr.ontimeout = () => reject(new Error('El servidor tardó demasiado en recibir el archivo. Intenta de nuevo.'));
+  xhr.send(archivo);
+});
 
 export default {
   get: <T>(path: string): Promise<T> => apiClient<T>(path),
+  getTodos,
+  getPagina,
+  getBlob,
   post: <T>(path: string, data: unknown): Promise<T> =>
     apiClient<T>(path, { method: 'POST', body: JSON.stringify(data) }),
+  postArchivo: <T>(path: string, archivo: File): Promise<T> =>
+    postArchivoConProgreso<T>(path, archivo),
+  postArchivoConProgreso,
   put: <T>(path: string, data: unknown): Promise<T> =>
     apiClient<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
   patch: <T>(path: string, data?: unknown): Promise<T> =>
