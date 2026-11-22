@@ -53,8 +53,12 @@ services:
       DB_NAME: ${DB_NAME:-muni_stodomingo}
       JWT_SECRET: ${JWT_SECRET:-clave_super_segura_de_al_menos_32_caracteres_aqui}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
-      FRONTEND_URL: http://localhost:${FRONTEND_PORT:-8080}
-      TRUST_PROXY: 1         # confía en 1 salto (Nginx) para la IP real en el rate limit
+      # Base de los enlaces de los correos (recuperar contraseña). compartir.bat la cambia
+      # por la URL pública mientras comparte y la devuelve a localhost al terminar.
+      FRONTEND_URL: ${PUBLIC_URL:-http://localhost:${FRONTEND_PORT:-8080}}
+      # Saltos de proxy de confianza para la IP real en el rate limit: 1 = Nginx.
+      # compartir.bat usa 2 (Cloudflare + Nginx); no lo subas a mano sin túnel.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       # Límites (por IP y por vecino). Los valores por defecto son los del backend.
       AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
       GENERAL_RATE_LIMIT_MAX: ${GENERAL_RATE_LIMIT_MAX:-100}

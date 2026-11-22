@@ -18,6 +18,8 @@ coverage/
 .env
 .env.local
 .env.docker.local
+# Token de Cloudflare de compartir.bat: nunca al repositorio
+cloudflare-token.txt
 .env.development.local
 .env.test.local
 .env.production.local
