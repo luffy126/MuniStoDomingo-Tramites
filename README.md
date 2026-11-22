@@ -2,7 +2,7 @@
 
 Aplicación móvil y web para que los vecinos de la **Municipalidad de Santo Domingo** realicen y sigan trámites municipales en línea, sin filas ni horarios de oficina.
 
-> **Esta rama (`docker`) contiene el proyecto completo listo para montar:** base de datos, API y frontend con un solo comando, sin instalar Node, MariaDB ni XAMPP. Ver [Puesta en marcha con Docker](#puesta-en-marcha-con-docker).
+> **Esta rama (`docker`) contiene el proyecto completo listo para montar:** base de datos, API y frontend con un solo comando, sin instalar Node, MariaDB ni XAMPP. **¿Primera vez en un computador nuevo? Sigue [`INSTALAR.md`](INSTALAR.md)** (paso a paso, con doble clic en `iniciar.bat`).
 
 ## Integrantes del equipo
 
@@ -87,18 +87,21 @@ Además: registro, recuperación de contraseña por correo y cancelación de sol
 
 ## Puesta en marcha con Docker
 
-Solo necesitas **Docker con Compose v2**. No hace falta instalar Node, npm, MariaDB ni XAMPP.
+Solo necesitas **Docker Desktop** (Docker con Compose v2). No hace falta instalar Node, npm, MariaDB ni XAMPP. La guía completa para humanos, con instalación de Docker y solución de problemas, está en [`INSTALAR.md`](INSTALAR.md).
 
 ```bash
 # Clonar la rama docker
 git clone -b docker https://github.com/luffy126/MuniStoDomingo-Tramites.git
 cd MuniStoDomingo-Tramites
-
-# Construir y levantar base de datos, API y frontend
-docker compose --env-file .env.docker up --build
 ```
 
-La primera vez tarda unos minutos. Cuando los tres contenedores estén `healthy`:
+Luego, en Windows, doble clic en **`iniciar.bat`** (en macOS/Linux: `./iniciar.sh`). Para detener, `detener.bat` / `./detener.sh`. Es lo mismo que:
+
+```bash
+docker compose --env-file .env.docker up -d --build --wait
+```
+
+La primera vez tarda unos minutos. Cuando el script dice "Listo":
 
 | Qué | URL |
 | --- | --- |
@@ -118,9 +121,13 @@ Si prefieres correr el backend y el frontend en tu equipo con `npm run dev`, lev
 
 ```
 .
+├── INSTALAR.md          Guía paso a paso para montarlo en otro computador
+├── iniciar.bat / .sh    Inicia todo con un doble clic (Windows) o ./iniciar.sh
+├── detener.bat / .sh    Detiene todo conservando los datos
 ├── docker-compose.yml   Orquestación: db + backend + frontend
 ├── .env.docker          Variables de ejemplo para docker compose
-├── DOCKER.md            Guía completa de despliegue con Docker
+├── DOCKER.md            Referencia técnica del despliegue con Docker
+├── Crear BD.md          Manual (para un agente de IA) para crear la base con Docker
 ├── sync.sh              Trae el código de las ramas backend y frontend
 ├── backend/             API Express (copia de la rama backend + Dockerfile)
 ├── frontend/            App Ionic/React (copia de la rama frontend + Dockerfile y nginx.conf)

@@ -1,4 +1,10 @@
-# Los scripts de shell y las configs que viajan a contenedores Linux siempre con LF
+# Finales de línea fijos, sin importar la configuración de Git de cada equipo.
+# Los scripts de shell y lo que viaja a contenedores Linux van siempre con LF;
+# los .bat de Windows, siempre con CRLF (cmd.exe falla con LF en algunos casos).
 *.sh text eol=lf
 *.conf text eol=lf
 Dockerfile text eol=lf
+.env.docker text eol=lf
+*.yml text eol=lf
+*.sql text eol=lf
+*.bat text eol=crlf

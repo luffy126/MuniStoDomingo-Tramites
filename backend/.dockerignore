@@ -13,6 +13,5 @@ Dockerfile
 .dockerignore
 scripts
 migrations
-Crear BD.md
 uploads
 .uploads-test

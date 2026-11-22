@@ -1,14 +1,18 @@
-# Despliegue con Docker
+# Despliegue con Docker (referencia técnica)
+
+> ¿Vas a montarlo en un computador nuevo? Sigue la guía paso a paso [`INSTALAR.md`](INSTALAR.md). Este documento es la referencia técnica.
 
 La aplicación completa (MariaDB + API Express + frontend Ionic/React servido por Nginx) se levanta con un solo comando. En la máquina solo se necesita **Docker con Compose v2** (`docker compose`). No hace falta instalar Node, npm, MariaDB ni XAMPP.
 
 ## Levantar
 
+Con los scripts: `iniciar.bat` (Windows, doble clic) o `./iniciar.sh` (macOS/Linux). Revisan que Docker esté encendido, usan `.env.docker.local` si existe, esperan a que todo esté sano y abren el navegador. A mano:
+
 ```bash
-docker compose --env-file .env.docker up --build
+docker compose --env-file .env.docker up -d --build --wait
 ```
 
-La primera vez tarda unos minutos (descarga imágenes y compila). Cuando los tres contenedores aparezcan como `healthy`:
+La primera vez tarda unos minutos (descarga imágenes y compila). `--wait` termina cuando los tres contenedores están `healthy`:
 
 | Qué | URL |
 |---|---|
@@ -22,8 +26,8 @@ La primera vez tarda unos minutos (descarga imágenes y compila). Cuando los tre
 ## Detener y reiniciar
 
 ```bash
-docker compose down        # detiene; los datos y los adjuntos se conservan en sus volúmenes
-docker compose --env-file .env.docker up -d   # vuelve a levantar con los mismos datos
+docker compose down        # detiene (o detener.bat); los datos y los adjuntos se conservan en sus volúmenes
+docker compose --env-file .env.docker up -d --wait   # vuelve a levantar con los mismos datos (o iniciar.bat)
 docker compose down -v     # detiene y BORRA la BD y los adjuntos; el próximo arranque vuelve a la semilla
 ```
 
@@ -102,8 +106,10 @@ EMAIL_REDIRECT_TO=tu_correo_de_la_cuenta_resend@ejemplo.cl   # solo con onboardi
 y levanta con los dos archivos (el segundo pisa al primero):
 
 ```bash
-docker compose --env-file .env.docker --env-file .env.docker.local up -d
+docker compose --env-file .env.docker --env-file .env.docker.local up -d --wait
 ```
+
+`iniciar.bat` / `iniciar.sh` agregan ese segundo archivo solos cuando existe.
 
 Sin clave de Resend la app funciona igual: el backend registra cada correo en los logs (`docker compose logs -f backend`) y ahí se lee el código de 6 dígitos de la verificación en dos pasos.
 
@@ -126,6 +132,8 @@ DB_NAME=muni_stodomingo
 ```
 
 Para reiniciar esa base a la semilla: `docker compose down -v` y vuelve a levantar `db`.
+
+Los pasos detallados para crear y verificar la base, pensados para que los siga un agente de IA, están en [`Crear BD.md`](Crear%20BD.md).
 
 ## Migrar una base que ya existía
 
