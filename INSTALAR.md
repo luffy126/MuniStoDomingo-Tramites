@@ -126,16 +126,54 @@ README) o lleva tu propio computador con Docker ya instalado y probado.
 
 ## Opcional: correos de verdad (Resend)
 
-Solo si quieres que los correos lleguen a una casilla real. Crea en la carpeta del proyecto un
-archivo llamado `.env.docker.local` (git lo ignora, así la clave no se sube) con:
+Solo si quieres que los correos (código de verificación, recuperar contraseña, avisos de
+estado) lleguen a la casilla real de cada usuario.
 
-```
-RESEND_API_KEY=re_tu_clave_real
-EMAIL_REDIRECT_TO=correo_de_tu_cuenta_resend@ejemplo.cl
-```
+1. Crea en la carpeta del proyecto un archivo llamado `.env.docker.local` (git lo ignora, así la
+   clave no se sube). En el Bloc de notas: **Guardar como → Tipo: Todos los archivos**, para que
+   no quede como `.env.docker.local.txt`.
+2. Escribe estas dos líneas con la clave real de Resend (pídesela al equipo; nunca la subas a GitHub):
 
-`iniciar.bat` lo detecta solo. Con el remitente de prueba de Resend, los correos solo llegan al
-dueño de la cuenta; por eso `EMAIL_REDIRECT_TO` desvía todos los mensajes a esa casilla.
+   ```
+   RESEND_API_KEY=re_tu_clave_real
+   EMAIL_FROM=MuniStoDomingo <no-reply@tenerex.cl>
+   ```
+
+3. Ejecuta `iniciar.bat`. Lo detecta solo y dice "Usando también .env.docker.local".
+4. Prueba: entra como vecino, activa la verificación en dos pasos y revisa que el código llegue
+   al correo. Si no llega, `docker compose logs backend` muestra el error de Resend.
+
+El dominio `tenerex.cl` ya está verificado en Resend, así que los correos llegan a cualquier
+dirección. Sin dominio verificado (remitente `onboarding@resend.dev`) solo llegan al dueño de
+la cuenta Resend; en ese caso agrega `EMAIL_REDIRECT_TO=tu_correo` para desviarlos todos ahí.
+
+Los enlaces de los correos apuntan a `http://localhost:8080`, así que solo abren en este mismo
+computador. Mientras uses `compartir.bat` (siguiente sección) apuntan a la URL pública.
+
+## Opcional: compartir con una URL pública (Cloudflare Tunnel)
+
+Para que otras personas (por ejemplo, la comisión desde sus celulares) entren a la app que
+corre en tu computador, sin abrir puertos del router.
+
+1. Una sola vez, instala `cloudflared` en PowerShell:
+   ```powershell
+   winget install --id Cloudflare.cloudflared
+   ```
+2. Inicia la app con `iniciar.bat` y espera a que diga "Listo".
+3. Doble clic en **`compartir.bat`**. Al final muestra la URL y la copia al portapapeles.
+4. **Ctrl + C** en esa ventana deja de compartir. La app sigue funcionando en localhost.
+
+| Modo | Cómo | URL |
+|---|---|---|
+| Dirección fija | Guarda el token de Cloudflare del equipo en un archivo `cloudflare-token.txt` en esta carpeta (git lo ignora). | `https://muni.tenerex.cl` |
+| Rápido, sin cuenta | Sin token, o desde PowerShell: `.\compartir.bat -Rapido` | Una al azar, `https://….trycloudflare.com`, distinta cada vez |
+
+Mientras comparte, la API usa la URL pública en los enlaces de los correos y reconoce la IP
+real de cada visitante para el límite de intentos. Al cerrar con Ctrl + C vuelve sola a la
+configuración local. Si cerraste la ventana con la X, ejecuta `iniciar.bat` otra vez.
+
+`muni.tenerex.cl` es el mismo túnel que usa la versión XAMPP (`Compartir.bat` de las ramas
+`backend`/`frontend`): solo una de las dos puede estar compartiendo a la vez.
 
 ## Más información
 
