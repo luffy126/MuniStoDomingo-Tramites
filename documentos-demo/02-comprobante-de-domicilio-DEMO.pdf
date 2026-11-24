@@ -1,0 +1,66 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1908 >>
+stream
+q BT 0.88 0.89 0.92 rg /F2 54 Tf 0.7071 0.7071 -0.7071 0.7071 110 220 Tm (DOCUMENTO FICTICIO) Tj ET Q
+0.05 0.12 0.38 rg 0 752 595 90 re f
+BT 1 1 1 rg /F2 20 Tf 50 794 Td (Comprobante de domicilio) Tj ET
+BT 0.8 0.85 0.95 rg /F1 11 Tf 50 772 Td (Boleta de servicio de ejemplo \267 Emitida hace menos de 3 meses) Tj ET
+0.83 0.18 0.18 rg 0 0 595 6 re f
+1 0.95 0.95 rg 50 40 495 34 re f
+BT 0.83 0.18 0.18 rg /F2 9 Tf 62 53 Td (Documento ficticio creado para la demo de MuniStoDomingo Tr\341mites. Sin validez legal.) Tj ET
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 700 Td (Empresa) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 700 Td (Servicios B\341sicos Ejemplo S.A.) Tj ET
+0.87 0.89 0.91 RG 1 w 50 690 m 545 690 l S
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 662 Td (Titular) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 662 Td (Vecino Demo Ejemplo) Tj ET
+0.87 0.89 0.91 RG 1 w 50 652 m 545 652 l S
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 624 Td (RUN titular) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 624 Td (11.111.111-1) Tj ET
+0.87 0.89 0.91 RG 1 w 50 614 m 545 614 l S
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 586 Td (Direcci\363n) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 586 Td (Av. Ejemplo 123, Santo Domingo) Tj ET
+0.87 0.89 0.91 RG 1 w 50 576 m 545 576 l S
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 548 Td (N\372mero de cliente) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 548 Td (000123456) Tj ET
+0.87 0.89 0.91 RG 1 w 50 538 m 545 538 l S
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 510 Td (Fecha de emisi\363n) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 510 Td (05-11-2026) Tj ET
+0.87 0.89 0.91 RG 1 w 50 500 m 545 500 l S
+BT 0.45 0.5 0.56 rg /F1 10 Tf 50 472 Td (Per\355odo facturado) Tj ET
+BT 0.12 0.16 0.22 rg /F2 12 Tf 230 472 Td (01-10-2026 al 31-10-2026) Tj ET
+0.87 0.89 0.91 RG 1 w 50 462 m 545 462 l S
+0.93 0.95 0.98 rg 50 384 495 60 re f
+BT 0.45 0.5 0.56 rg /F1 11 Tf 65 419 Td (Total a pagar) Tj ET
+BT 0.12 0.39 0.71 rg /F2 18 Tf 65 397 Td ($ 12.345) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2410
+%%EOF
